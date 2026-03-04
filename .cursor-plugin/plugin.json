@@ -9,7 +9,7 @@
     "url": "https://www.cubic.dev"
   },
   "homepage": "https://docs.cubic.dev/integrations/mcp-server#mcp-server",
-  "repository": "https://github.com/mrge-io/cubic-claude-plugin",
+  "repository": "https://github.com/mrge-io/skills",
   "license": "MIT",
   "keywords": [
     "code-review",
