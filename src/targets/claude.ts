@@ -15,7 +15,13 @@ import {
 const COMMANDS = ["comments.md", "wiki.md", "scan.md", "learnings.md", "run-review.md"]
 
 export const claude: Target = {
-  async install(pluginRoot: string, outputRoot: string, apiKey?: string, method: InstallMethod = "paste"): Promise<TargetResult> {
+  async install(
+    pluginRoot: string,
+    outputRoot: string,
+    apiKey?: string,
+    method: InstallMethod = "paste",
+    _pluginMcpConfig?: Record<string, Record<string, unknown>>,
+  ): Promise<TargetResult> {
     await mergeJsonConfig(path.join(outputRoot, ".mcp.json"), {
       cubic: {
         type: "http",

@@ -22,7 +22,13 @@ const CUBIC_COMMANDS = [
 ]
 
 export const cursor: Target = {
-  async install(pluginRoot: string, outputRoot: string, apiKey?: string, method: InstallMethod = "paste"): Promise<TargetResult> {
+  async install(
+    pluginRoot: string,
+    outputRoot: string,
+    apiKey?: string,
+    method: InstallMethod = "paste",
+    _pluginMcpConfig?: Record<string, Record<string, unknown>>,
+  ): Promise<TargetResult> {
     const skillCount = await installSkills(pluginRoot, path.join(outputRoot, "skills"), method)
 
     const cmdSource = path.join(pluginRoot, "commands")
