@@ -23,6 +23,8 @@ User-provided flags: $ARGUMENTS
    curl -fsSL https://cubic.dev/install | bash
    ```
 
+   If you provide multi-line install commands, avoid trailing spaces after a line-continuation backslash (`\`).
+
    **npm / pnpm:**
 
    ```
