@@ -99,6 +99,42 @@ The installer will prompt you for your API key during `npx @cubic-plugin/cubic-p
 
 You can also set `CUBIC_API_KEY` in your environment and the installer will detect it automatically.
 
+### Setup wizard hangs on "Installing…"
+
+If your setup wrapper runs the installer in JSON mode and waits at the MCP + Skills step, there are two common causes:
+
+- missing stdin input for the API key handshake
+- the wrapper never times out a stuck post-auth install step and keeps showing a spinner while the child process is blocked on file or target installation work
+
+Use one of these approaches to avoid hangs:
+
+- Set `CUBIC_API_KEY` before running setup (recommended for CI/team automation)
+- Ensure the parent process writes the key to installer stdin after the `auth_prompt` event
+- Adjust prompt timeout with `CUBIC_AUTH_PROMPT_TIMEOUT_MS` (default: `120000`)
+- Adjust plugin fetch timeout with `CUBIC_PLUGIN_CLONE_TIMEOUT_MS` (default: `90000`)
+- Adjust the overall install timeout with `CUBIC_INSTALL_TIMEOUT_MS` (default: `300000`)
+- Adjust the per-target install timeout with `CUBIC_TARGET_INSTALL_TIMEOUT_MS` (default: `60000`)
+
+Example:
+
+```bash
+export CUBIC_API_KEY=cbk_your_key_here
+# Optional: increase timeout for slow orchestration environments
+export CUBIC_AUTH_PROMPT_TIMEOUT_MS=180000
+export CUBIC_PLUGIN_CLONE_TIMEOUT_MS=180000
+export CUBIC_INSTALL_TIMEOUT_MS=300000
+export CUBIC_TARGET_INSTALL_TIMEOUT_MS=120000
+npx @cubic-plugin/cubic-plugin install --to claude --json
+```
+
+On timeout, the installer exits quickly with a structured JSON event instead of hanging forever:
+
+- `type: "install_failed"`
+- `code: "AUTH_PROMPT_TIMEOUT"`, `"INSTALL_TIMEOUT"`, or `"TARGET_WRITE_FAILED"`
+- `retryable: true`
+
+The installer now also avoids mutating the plugin's source `.mcp.json` during setup. It resolves the MCP config in memory and passes it to targets directly, which makes retries safer and reduces cleanup work if the wrapper is interrupted.
+
 > **Tip:** In Claude Code, you can also just say "set up my cubic key" and paste your key — the installer will detect your OS and shell and save it automatically.
 
 ## Commands

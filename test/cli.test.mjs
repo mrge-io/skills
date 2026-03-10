@@ -160,6 +160,168 @@ describe("install --json error paths", () => {
       assert.equal(failed.retryable, false)
     }
   })
+
+  it("missing stdin input emits install_failed with AUTH_PROMPT_TIMEOUT", async () => {
+    const outDir = path.join(TMP_BASE, "json-auth-timeout")
+
+    try {
+      await exec(
+        "node",
+        [
+          CLI,
+          "install",
+          "--json",
+          "--to",
+          "claude",
+          "-o",
+          outDir,
+        ],
+        {
+          env: {
+            ...process.env,
+            CUBIC_API_KEY: "",
+            CUBIC_AUTH_PROMPT_TIMEOUT_MS: "1",
+          },
+          input: "",
+          timeout: 5000,
+        },
+      )
+      assert.fail("should have exited with non-zero code")
+    } catch (err) {
+      assert.ok(err.code !== 0, "exit code should be non-zero")
+      const events = (err.stdout || "")
+        .trim()
+        .split("\n")
+        .filter((l) => l)
+        .map((l) => JSON.parse(l))
+
+      const failed = events.find((e) => e.type === "install_failed")
+      assert.ok(failed)
+      assert.equal(failed.code, "AUTH_PROMPT_TIMEOUT")
+      assert.equal(failed.retryable, true)
+    }
+  })
+
+  it("invalid clone timeout env falls back and installs in skills-only mode", async () => {
+    const outDir = path.join(TMP_BASE, "json-invalid-clone-timeout")
+    const { stdout } = await exec(
+      "node",
+      [
+        CLI,
+        "install",
+        "--json",
+        "--skills-only",
+        "--to",
+        "claude",
+        "-o",
+        outDir,
+      ],
+      {
+        env: {
+          ...process.env,
+          CUBIC_PLUGIN_CLONE_TIMEOUT_MS: "not-a-number",
+        },
+      },
+    )
+
+    const events = stdout
+      .trim()
+      .split("\n")
+      .map((l) => JSON.parse(l))
+
+    const last = events[events.length - 1]
+    assert.equal(last.type, "install_completed")
+    assert.equal(last.ok, true)
+  })
+
+  it("overall install timeout emits install_failed with INSTALL_TIMEOUT", async () => {
+    const outDir = path.join(TMP_BASE, "json-install-timeout")
+
+    try {
+      await exec(
+        "node",
+        [
+          CLI,
+          "install",
+          "--json",
+          "--skills-only",
+          "--to",
+          "claude",
+          "-o",
+          outDir,
+        ],
+        {
+          env: {
+            ...process.env,
+            NODE_ENV: "test",
+            CUBIC_INSTALL_TIMEOUT_MS: "20",
+            CUBIC_TEST_INSTALL_DELAY_MS: "100",
+          },
+          timeout: 5000,
+        },
+      )
+      assert.fail("should have exited with non-zero code")
+    } catch (err) {
+      assert.ok(err.code !== 0, "exit code should be non-zero")
+      const events = (err.stdout || "")
+        .trim()
+        .split("\n")
+        .filter((l) => l)
+        .map((l) => JSON.parse(l))
+
+      const failed = events.find((e) => e.type === "install_failed")
+      assert.ok(failed)
+      assert.equal(failed.code, "INSTALL_TIMEOUT")
+      assert.equal(failed.retryable, true)
+    }
+  })
+
+  it("per-target timeout emits target_result failure and install_failed", async () => {
+    const outDir = path.join(TMP_BASE, "json-target-timeout")
+
+    try {
+      await exec(
+        "node",
+        [
+          CLI,
+          "install",
+          "--json",
+          "--skills-only",
+          "--to",
+          "claude",
+          "-o",
+          outDir,
+        ],
+        {
+          env: {
+            ...process.env,
+            NODE_ENV: "test",
+            CUBIC_TARGET_INSTALL_TIMEOUT_MS: "20",
+            CUBIC_TEST_TARGET_INSTALL_DELAY_MS: "100",
+          },
+          timeout: 5000,
+        },
+      )
+      assert.fail("should have exited with non-zero code")
+    } catch (err) {
+      assert.ok(err.code !== 0, "exit code should be non-zero")
+      const events = (err.stdout || "")
+        .trim()
+        .split("\n")
+        .filter((l) => l)
+        .map((l) => JSON.parse(l))
+
+      const result = events.find((e) => e.type === "target_result")
+      assert.ok(result)
+      assert.equal(result.status, "failed")
+      assert.match(result.reason, /Timed out while installing target 'claude'/)
+
+      const failed = events.find((e) => e.type === "install_failed")
+      assert.ok(failed)
+      assert.equal(failed.code, "TARGET_WRITE_FAILED")
+      assert.equal(failed.retryable, true)
+    }
+  })
 })
 
 describe("install text mode (backward compatibility)", () => {
