@@ -169,8 +169,17 @@ export async function removeMcpFromConfig(configPath: string): Promise<void> {
 export const CUBIC_SKILLS = [
   "review-patterns",
   "codebase-context",
-  "review-and-fix-issues",
+  "check-pr-comments",
   "run-review",
+  "cubic-loop",
+]
+
+const LEGACY_CUBIC_SKILLS = [
+  "review-and-fix-issues",
+]
+
+const SKILL_RENAMES = [
+  { from: "review-and-fix-issues", to: "check-pr-comments" },
 ]
 
 export async function installSkills(
@@ -182,6 +191,15 @@ export async function installSkills(
   if (!(await pathExists(sourceDir))) return 0
 
   await fs.mkdir(skillsDir, { recursive: true })
+
+  for (const rename of SKILL_RENAMES) {
+    const newSkill = path.join(sourceDir, rename.to, "SKILL.md")
+    const legacyTarget = path.join(skillsDir, rename.from)
+    if (await pathExists(newSkill)) {
+      await fs.rm(legacyTarget, { recursive: true, force: true })
+    }
+  }
+
   const entries = await fs.readdir(sourceDir, { withFileTypes: true })
   let count = 0
 
@@ -199,7 +217,7 @@ export async function installSkills(
 
 export async function uninstallSkills(skillsDir: string): Promise<number> {
   let count = 0
-  for (const skill of CUBIC_SKILLS) {
+  for (const skill of [...CUBIC_SKILLS, ...LEGACY_CUBIC_SKILLS]) {
     const dir = path.join(skillsDir, skill)
     if (await pathExists(dir)) {
       await fs.rm(dir, { recursive: true })

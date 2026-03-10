@@ -15,20 +15,10 @@ User-provided flags: $ARGUMENTS
 
 ## Instructions
 
-1. **Check CLI is installed**: Run `which cubic`. If not found, stop and show the user these install options:
+1. **Check CLI is installed**: Run `which cubic`. If not found, stop and show the user this install command:
 
-   **macOS / Linux:**
-
-   ```
+   ```bash
    curl -fsSL https://cubic.dev/install | bash
-   ```
-
-   If you provide multi-line install commands, avoid trailing spaces after a line-continuation backslash (`\`).
-
-   **npm / pnpm:**
-
-   ```
-   npm install -g @cubic-dev-ai/cli
    ```
 
    After installing, the user needs to authenticate by running `cubic auth` and following the browser login flow. Once done, they can re-run this command.

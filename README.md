@@ -127,8 +127,9 @@ These activate automatically based on what you're doing:
 
 | Skill                  | Triggers when                                  | What it does                                                       |
 | ---------------------- | ---------------------------------------------- | ------------------------------------------------------------------ |
-| **review-and-fix-issues** | Working on a PR branch, fixing review comments | Fetches all cubic issues, investigates each, and reports which are worth fixing |
+| **check-pr-comments**    | Working on a PR branch, fixing review comments | Fetches cubic PR comments from GitHub, investigates each, and reports which are worth fixing |
 | **run-review**         | "Review my code", pre-commit/PR quality checks | Runs a local cubic AI code review via CLI and surfaces issues      |
+| **cubic-loop**         | "Loop until clean", polishing before merge     | Iteratively reviews, fixes, and re-reviews until clean             |
 | **codebase-context**   | Asking about architecture or how things work   | Queries the cubic AI Wiki for architectural context                |
 | **review-patterns**    | Writing or reviewing code                      | Pulls team learnings to apply coding conventions                   |
 
@@ -156,9 +157,11 @@ skills/
 │   ├── scan.md            # /cubic:scan command
 │   └── learnings.md       # /cubic:learnings command
 ├── skills/
-│   ├── review-and-fix-issues/ # Fetches, investigates, and triages PR review issues
+│   ├── check-pr-comments/ # Fetches, investigates, and triages PR review comments
 │   │   └── SKILL.md
 │   ├── run-review/        # Runs local AI code review via cubic CLI
+│   │   └── SKILL.md
+│   ├── cubic-loop/        # Iteratively reviews, fixes, and re-reviews until clean
 │   │   └── SKILL.md
 │   ├── codebase-context/  # Auto-queries wiki for architecture context
 │   │   └── SKILL.md

@@ -1,33 +1,73 @@
 ---
 name: review-patterns
-description: Use when the user is writing code, reviewing code, asking about code quality standards, or wondering "what does this team care about in reviews". Pulls team-specific review learnings from cubic to apply the team's coding conventions and review preferences.
+description: >
+  Surfaces the team's coding patterns and conventions learned by cubic from senior reviewer
+  feedback and codebase analysis. Use when the user is writing code, asking about team standards,
+  or wondering "how does this team do X".
+allowed-tools: [Bash, cubic:list_learnings, cubic:get_learning]
 ---
 
 # Team Review Patterns
 
-This skill pulls team-specific code review learnings from cubic to apply the team's conventions when writing or reviewing code.
+Surface the team's coding conventions and review preferences from cubic's learned patterns.
 
-## When to Activate
+## When To Activate
 
 - User is writing new code and wants it to match team standards
 - User asks about team coding conventions or review preferences
 - User is preparing code for review and wants to preemptively fix issues
 - User wonders why cubic flags certain patterns
 
-## How to Use
+## Inputs
 
-1. Detect the current repository from git remote: `git remote get-url origin`
-2. Call `list_learnings` with the owner and repo
-3. Filter learnings by relevance to the user's current task:
-   - Match learning categories to the type of code being written
-   - Prioritize high-confidence learnings
-   - Focus on learnings from senior reviewer analysis (highest signal)
-4. If a specific learning is relevant, call `get_learning` for full details including the original feedback
+- **Context** (optional): What the user is currently working on, to filter relevant learnings.
 
-## Presentation
+## Instructions
 
-- Present learnings as team preferences, not rigid rules
-- Connect each learning to the user's current code when possible
-- Group related learnings together
-- Mention the confidence level so the user can judge how strongly the team feels about each pattern
-- If no learnings exist, explain that cubic learns patterns over time from senior reviewer feedback
+### 1. Detect the repository
+
+```bash
+git remote get-url origin
+```
+
+Extract the owner and repo name.
+
+### 2. Fetch learnings
+
+Call `list_learnings` with the owner and repo.
+
+### 3. Filter by relevance
+
+Match learning categories to the user's current task:
+
+- Prioritize high-confidence learnings
+- Focus on learnings from senior reviewer analysis (highest signal)
+- If the user is working on a specific file or module, prioritize related learnings
+
+### 4. Enrich if needed
+
+If a specific learning is highly relevant, call `get_learning` for full details including the original review feedback that generated it.
+
+## Output Format
+
+Present learnings as team preferences, not rigid rules. Group related learnings and include confidence levels.
+
+```
+## Team Patterns for this repo
+
+### Error Handling (High Confidence)
+- **Always wrap external API calls in try/catch** — The team prefers explicit error
+  handling over global middleware. Learned from senior reviewer feedback.
+- **Use custom error classes** — Throw `AppError` subclasses, not raw `Error`.
+
+### Naming (Medium Confidence)
+- **Boolean variables use `is`/`has` prefix** — e.g., `isActive`, `hasPermission`.
+
+### Testing (High Confidence)
+- **Integration tests for all API endpoints** — Unit tests alone are not sufficient
+  for route handlers.
+
+_3 learnings from senior reviewer analysis · 1 from user feedback_
+```
+
+If no learnings exist, explain that cubic learns patterns over time from senior reviewer feedback.

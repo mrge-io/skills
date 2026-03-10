@@ -4,7 +4,8 @@ import { execFile } from "node:child_process"
 import { promisify } from "node:util"
 import path from "node:path"
 import { fileURLToPath } from "node:url"
-import { rm } from "node:fs/promises"
+import { access, mkdir, rm, writeFile } from "node:fs/promises"
+import { pathToFileURL } from "node:url"
 
 const exec = promisify(execFile)
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
@@ -195,5 +196,63 @@ describe("install text mode (backward compatibility)", () => {
       }
       assert.ok(!isJson, `unexpected JSON event in text mode: ${line}`)
     }
+  })
+})
+
+describe("uninstallSkills", () => {
+  after(cleanup)
+
+  it("removes cubic-loop along with the existing cubic skills", async () => {
+    const skillsDir = path.join(TMP_BASE, "uninstall-skills", "skills")
+    const skillNames = [
+      "review-patterns",
+      "codebase-context",
+      "check-pr-comments",
+      "review-and-fix-issues",
+      "run-review",
+      "cubic-loop",
+    ]
+
+    for (const skill of skillNames) {
+      const dir = path.join(skillsDir, skill)
+      await mkdir(dir, { recursive: true })
+      await writeFile(path.join(dir, "SKILL.md"), `name: ${skill}\n`)
+    }
+
+    const utils = await import(
+      pathToFileURL(path.join(__dirname, "..", "dist", "utils.js")).href
+    )
+
+    const removed = await utils.uninstallSkills(skillsDir)
+    assert.equal(removed, skillNames.length)
+
+    for (const skill of skillNames) {
+      await assert.rejects(
+        access(path.join(skillsDir, skill)),
+      )
+    }
+  })
+})
+
+describe("installSkills", () => {
+  after(cleanup)
+
+  it("removes the legacy review-and-fix-issues directory when check-pr-comments is installed", async () => {
+    const skillsDir = path.join(TMP_BASE, "install-skills", "skills")
+    const legacyDir = path.join(skillsDir, "review-and-fix-issues")
+    const pluginRoot = path.join(__dirname, "..")
+
+    await mkdir(legacyDir, { recursive: true })
+    await writeFile(path.join(legacyDir, "SKILL.md"), "name: review-and-fix-issues\n")
+
+    const utils = await import(
+      pathToFileURL(path.join(__dirname, "..", "dist", "utils.js")).href
+    )
+
+    const count = await utils.installSkills(pluginRoot, skillsDir)
+    assert.ok(count >= 5)
+
+    await assert.rejects(access(legacyDir))
+    await access(path.join(skillsDir, "check-pr-comments", "SKILL.md"))
   })
 })
