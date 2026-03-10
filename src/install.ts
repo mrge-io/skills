@@ -192,6 +192,16 @@ export default defineCommand({
         }
         throw err
       }
+      if (jsonMode && !apiKey) {
+        emit({
+          type: "install_failed",
+          code: "AUTH_REQUIRED",
+          message: "JSON mode requires CUBIC_API_KEY in the environment",
+          retryable: true,
+        })
+        process.exitCode = 1
+        return
+      }
     }
 
     let pluginRoot: string

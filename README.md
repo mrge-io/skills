@@ -99,6 +99,16 @@ The installer will prompt you for your API key during `npx @cubic-plugin/cubic-p
 
 You can also set `CUBIC_API_KEY` in your environment and the installer will detect it automatically.
 
+### Non-interactive JSON mode (for wrappers/installers)
+
+When using JSON mode (`--json`) from another CLI wrapper, installation is intentionally non-interactive. Set `CUBIC_API_KEY` first:
+
+```bash
+CUBIC_API_KEY="cbk_..." npx -y @cubic-plugin/cubic-plugin install --json --method symlink
+```
+
+If `CUBIC_API_KEY` is missing, JSON mode returns a structured `install_failed` event with `code: "AUTH_REQUIRED"`.
+
 > **Tip:** In Claude Code, you can also just say "set up my cubic key" and paste your key — the installer will detect your OS and shell and save it automatically.
 
 ## Commands

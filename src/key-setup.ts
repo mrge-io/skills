@@ -19,24 +19,6 @@ function ask(question: string): Promise<string> {
   })
 }
 
-/** Read a single line from stdin without writing a prompt to stdout. */
-function readStdinLine(): Promise<string> {
-  return new Promise((resolve) => {
-    const rl = readline.createInterface({ input: process.stdin })
-    let gotLine = false
-
-    rl.once("line", (line) => {
-      gotLine = true
-      rl.close()
-      resolve(line.trim())
-    })
-
-    rl.once("close", () => {
-      if (!gotLine) resolve("")
-    })
-  })
-}
-
 function openBrowser(url: string): void {
   const platform = os.platform()
   let cmd: string
@@ -88,25 +70,12 @@ export async function promptForApiKey(
     }
 
     emit({ type: "auth_open_url", url: CUBIC_URL })
-    emit({ type: "auth_prompt", field: "api_key", masked: true })
-
-    // Parent writes the key to our stdin after seeing auth_prompt
-    const raw = await readStdinLine()
-    const key = raw.replace(/^["']|["']$/g, "")
-
-    if (!key) {
-      return undefined
-    }
-
-    if (!key.startsWith("cbk_")) {
-      emit({
-        type: "auth_warning",
-        message: "Key doesn't start with 'cbk_'. Double-check your key.",
-      })
-    }
-
-    emit({ type: "auth_success", source: "prompt" })
-    return key
+    emit({
+      type: "auth_warning",
+      message:
+        "JSON mode is non-interactive. Set CUBIC_API_KEY in the environment before running install.",
+    })
+    return undefined
   }
 
   // ── Text mode: original interactive UX ──────────────────────

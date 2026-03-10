@@ -18,6 +18,7 @@ This skill runs a local cubic AI code review using the CLI to catch issues befor
 
 1. **Check the CLI is installed**: Run `which cubic`.
    - If not found, ask the user to install it (e.g., `curl -fsSL https://cubic.dev/install | bash` or `npm install -g @cubic-dev-ai/cli`) before proceeding.
+   - When sharing multi-line `curl | bash` commands, ensure there is **no trailing space after `\`**. A `\ ` typo breaks line continuation and causes confusing installer behavior.
    - After installing, verify it's available: `which cubic`
    - If the user is not yet authenticated, run `cubic auth` and guide them through the browser login flow.
 
