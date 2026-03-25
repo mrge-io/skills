@@ -7,6 +7,8 @@ import yaml from "js-yaml"
 
 export type InstallMethod = "paste" | "symlink"
 
+const STABLE_PLUGIN_DIR = path.join(".cubic-plugin", "plugin-source")
+
 export function inlineApiKey(
   mcpConfig: Record<string, unknown>,
   apiKey: string,
@@ -280,6 +282,56 @@ export async function resolvePluginRoot(silent?: boolean): Promise<{ pluginRoot:
     return { pluginRoot: packageRoot, cloned: false }
   }
   return { pluginRoot: await cloneFromGitHub(silent), cloned: true }
+}
+
+function isSubpath(parent: string, child: string): boolean {
+  const relative = path.relative(parent, child)
+  return relative === "" || (!relative.startsWith("..") && !path.isAbsolute(relative))
+}
+
+async function isEphemeralPluginRoot(
+  pluginRoot: string,
+  homeDir: string,
+): Promise<boolean> {
+  const realRoot = await fs.realpath(pluginRoot)
+  const npxRoot = path.join(homeDir, ".npm", "_npx")
+  if (isSubpath(npxRoot, realRoot)) return true
+  if (realRoot.split(path.sep).includes("_npx")) return true
+
+  const tempRoot = path.resolve(os.tmpdir())
+  if (!isSubpath(tempRoot, realRoot)) return false
+
+  return path.basename(realRoot).startsWith("cubic-plugin-install-")
+}
+
+async function copyDirectory(source: string, target: string): Promise<void> {
+  await fs.cp(source, target, { recursive: true })
+}
+
+export async function resolveInstallPluginRoot(
+  pluginRoot: string,
+  method: InstallMethod,
+  options: { homeDir?: string } = {},
+): Promise<string> {
+  if (method !== "symlink") return pluginRoot
+
+  const homeDir = options.homeDir ?? os.homedir()
+  if (!(await isEphemeralPluginRoot(pluginRoot, homeDir))) {
+    return pluginRoot
+  }
+
+  const stableRoot = path.join(homeDir, STABLE_PLUGIN_DIR)
+  const parentDir = path.dirname(stableRoot)
+  await fs.mkdir(parentDir, { recursive: true })
+  const stagingDir = await fs.mkdtemp(path.join(parentDir, "plugin-source-"))
+  const stagedRoot = path.join(stagingDir, "plugin-source")
+
+  await copyDirectory(pluginRoot, stagedRoot)
+  await fs.rm(stableRoot, { recursive: true, force: true })
+  await fs.rename(stagedRoot, stableRoot)
+  await fs.rm(stagingDir, { recursive: true, force: true })
+
+  return stableRoot
 }
 
 async function cloneFromGitHub(silent?: boolean): Promise<string> {
