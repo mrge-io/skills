@@ -127,7 +127,7 @@ These activate automatically based on what you're doing:
 
 | Skill                  | Triggers when                                  | What it does                                                       |
 | ---------------------- | ---------------------------------------------- | ------------------------------------------------------------------ |
-| **check-pr-comments**    | Working on a PR branch, fixing review comments | Fetches cubic PR comments from GitHub, investigates each, and reports which are worth fixing |
+| **check-pr-comments**    | "Check all PR comments", PR comments/issues, fixing review feedback | Fetches unresolved cubic PR comments, fixes worthwhile issues, commits/pushes, and resolves handled threads |
 | **run-review**         | "Review my code", pre-commit/PR quality checks | Runs a local cubic AI code review via CLI and surfaces issues      |
 | **cubic-loop**         | "Loop until clean", polishing before merge     | Iteratively reviews, fixes, and re-reviews until clean             |
 | **codebase-context**   | Asking about architecture or how things work   | Queries the cubic AI Wiki for architectural context                |
