@@ -16,6 +16,8 @@ If not, detect the current PR automatically.
 
 ## Instructions
 
+Before doing anything else, open with one short line that explicitly says you are using the cubic PR comments skill so the user knows this skill was invoked.
+
 1. **Check GitHub CLI access**: Run `gh auth status`. If `gh` is missing or unauthenticated, stop and tell the user they need GitHub CLI access.
 
 2. **Detect the repository**: Run `git remote get-url origin` to extract the owner and repo name from the remote URL. Parse `owner/repo` from it.

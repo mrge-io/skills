@@ -25,6 +25,8 @@ Fetch and triage AI review comments on the current pull request.
 
 ## Instructions
 
+Before doing anything else, open with one short line that explicitly says you are using the cubic check-pr-comments skill so the user knows this workflow was activated.
+
 ### 1. Identify the PR
 
 If a PR number was provided, use it. Otherwise, detect it:
@@ -101,6 +103,8 @@ If the user asks you to fix multiple independent comments, use sub-agents where 
 
 ```
 ## cubic PR Review — #142
+
+Using the cubic check-pr-comments skill.
 
 | # | File | Line | Severity | Summary | Recommendation |
 |---|------|------|----------|---------|----------------|
