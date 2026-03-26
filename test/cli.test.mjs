@@ -256,3 +256,54 @@ describe("installSkills", () => {
     await access(path.join(skillsDir, "check-pr-comments", "SKILL.md"))
   })
 })
+
+describe("resolveInstallPluginRoot", () => {
+  after(cleanup)
+
+  it("materializes ephemeral npx plugin roots into a stable home directory for symlink installs", async () => {
+    const homeDir = path.join(TMP_BASE, "stable-home")
+    const pluginRoot = path.join(
+      TMP_BASE,
+      "ephemeral",
+      ".npm",
+      "_npx",
+      "cache123",
+      "node_modules",
+      "@cubic-plugin",
+      "cubic-plugin",
+    )
+
+    await mkdir(path.join(pluginRoot, "skills", "check-pr-comments"), { recursive: true })
+    await writeFile(path.join(pluginRoot, "skills", "check-pr-comments", "SKILL.md"), "name: check-pr-comments\n")
+    await writeFile(path.join(pluginRoot, ".mcp.json"), "{}\n")
+    await writeFile(path.join(pluginRoot, "package.json"), JSON.stringify({ name: "@cubic-plugin/cubic-plugin", version: "1.3.1" }))
+
+    const utils = await import(
+      pathToFileURL(path.join(__dirname, "..", "dist", "utils.js")).href
+    )
+
+    const stableRoot = await utils.resolveInstallPluginRoot(pluginRoot, "symlink", { homeDir })
+    const expectedRoot = path.join(homeDir, ".cubic-plugin", "plugin-source")
+
+    assert.equal(stableRoot, expectedRoot)
+    await access(path.join(expectedRoot, "skills", "check-pr-comments", "SKILL.md"))
+    await access(path.join(expectedRoot, ".mcp.json"))
+  })
+
+  it("keeps local repository plugin roots unchanged for symlink installs", async () => {
+    const homeDir = path.join(TMP_BASE, "local-home")
+    const pluginRoot = path.join(TMP_BASE, "local-plugin-root")
+
+    await mkdir(path.join(pluginRoot, "skills", "check-pr-comments"), { recursive: true })
+    await writeFile(path.join(pluginRoot, "skills", "check-pr-comments", "SKILL.md"), "name: check-pr-comments\n")
+    await writeFile(path.join(pluginRoot, ".mcp.json"), "{}\n")
+    await writeFile(path.join(pluginRoot, "package.json"), JSON.stringify({ name: "@cubic-plugin/cubic-plugin", version: "1.3.1" }))
+
+    const utils = await import(
+      pathToFileURL(path.join(__dirname, "..", "dist", "utils.js")).href
+    )
+
+    const resolvedRoot = await utils.resolveInstallPluginRoot(pluginRoot, "symlink", { homeDir })
+    assert.equal(resolvedRoot, pluginRoot)
+  })
+})

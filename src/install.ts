@@ -5,6 +5,7 @@ import {
   pathExists,
   inlineApiKey,
   resolvePluginRoot,
+  resolveInstallPluginRoot,
   installReviewSkill,
   installReviewCommand,
   TARGET_LAYOUTS,
@@ -205,11 +206,18 @@ export default defineCommand({
     }
 
     let pluginRoot: string
+    let sourcePluginRoot: string
     let cloned: boolean
     try {
       const resolved = await resolvePluginRoot(jsonMode)
-      pluginRoot = resolved.pluginRoot
+      sourcePluginRoot = resolved.pluginRoot
       cloned = resolved.cloned
+      try {
+        pluginRoot = await resolveInstallPluginRoot(sourcePluginRoot, method)
+      } catch (err) {
+        if (cloned) await fs.rm(sourcePluginRoot, { recursive: true, force: true }).catch(() => {})
+        throw err
+      }
     } catch (err) {
       if (jsonMode) {
         const message = err instanceof Error ? err.message : String(err)
@@ -234,21 +242,6 @@ export default defineCommand({
       pluginVersion,
       target: targetName,
     })
-
-    if (method === "symlink" && cloned) {
-      const msg = "Symlink requires a local plugin source. Use --method paste or clone the repo first."
-      if (jsonMode) {
-        emit({
-          type: "install_failed",
-          code: "SYMLINK_NO_LOCAL_SOURCE",
-          message: msg,
-          retryable: false,
-        })
-        process.exitCode = 1
-        return
-      }
-      throw new Error(msg)
-    }
 
     const mcpPath = path.join(pluginRoot, ".mcp.json")
     let originalMcp: string | undefined
@@ -370,7 +363,7 @@ export default defineCommand({
         await fs.writeFile(mcpPath, originalMcp)
       }
       if (cloned) {
-        await fs.rm(pluginRoot, { recursive: true, force: true })
+        await fs.rm(sourcePluginRoot, { recursive: true, force: true })
       }
     }
 
