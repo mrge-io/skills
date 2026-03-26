@@ -298,7 +298,7 @@ async function isEphemeralPluginRoot(
   if (isSubpath(npxRoot, realRoot)) return true
   if (realRoot.split(path.sep).includes("_npx")) return true
 
-  const tempRoot = path.resolve(os.tmpdir())
+  const tempRoot = await fs.realpath(os.tmpdir())
   if (!isSubpath(tempRoot, realRoot)) return false
 
   return path.basename(realRoot).startsWith("cubic-plugin-install-")
@@ -326,10 +326,13 @@ export async function resolveInstallPluginRoot(
   const stagingDir = await fs.mkdtemp(path.join(parentDir, "plugin-source-"))
   const stagedRoot = path.join(stagingDir, "plugin-source")
 
-  await copyDirectory(pluginRoot, stagedRoot)
-  await fs.rm(stableRoot, { recursive: true, force: true })
-  await fs.rename(stagedRoot, stableRoot)
-  await fs.rm(stagingDir, { recursive: true, force: true })
+  try {
+    await copyDirectory(pluginRoot, stagedRoot)
+    await fs.rm(stableRoot, { recursive: true, force: true })
+    await fs.rename(stagedRoot, stableRoot)
+  } finally {
+    await fs.rm(stagingDir, { recursive: true, force: true })
+  }
 
   return stableRoot
 }

@@ -212,7 +212,12 @@ export default defineCommand({
       const resolved = await resolvePluginRoot(jsonMode)
       sourcePluginRoot = resolved.pluginRoot
       cloned = resolved.cloned
-      pluginRoot = await resolveInstallPluginRoot(sourcePluginRoot, method)
+      try {
+        pluginRoot = await resolveInstallPluginRoot(sourcePluginRoot, method)
+      } catch (err) {
+        if (cloned) await fs.rm(sourcePluginRoot, { recursive: true, force: true }).catch(() => {})
+        throw err
+      }
     } catch (err) {
       if (jsonMode) {
         const message = err instanceof Error ? err.message : String(err)
