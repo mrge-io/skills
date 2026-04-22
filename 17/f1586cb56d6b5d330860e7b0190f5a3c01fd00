@@ -1,0 +1,88 @@
+README.md
+  7e52e8255e35406d 45-48
+scripts/clean-home-install.mjs
+  b323dcc701c8a110 28-39
+  7e52e8255e35406d 1-5,11-26,47-65,67-80
+  7ef0e5b4d894b376 6-10,27,40-46,66
+src/targets/universal.ts
+  7e52e8255e35406d 2,60
+package.json
+  7e52e8255e35406d 21-22
+src/install.ts
+  7ef0e5b4d894b376 45,49-50,57,60,63-66,68,76-111,114-115,118-120,122-132,134,136-152,164-185,188-193,195,198-199,210-214,217-221,223-227,229-233,235,241,260-263,266,274-275,278-281,360-373,375,377,385,417
+  7e52e8255e35406d 34-36,46-48,51-55,67,69-71,133,135,186-187,200-209,215-216,222,228,234,236-240,245-246,250-259,264-265,267-273,283-338,394-400,404-408,414,426-428,438,535-539,549-552,639-645,653,655-690,702-703,712-722,778,793-795,828,857-859
+  b323dcc701c8a110 153-163,194,196-197,276-277,282
+  ad1b0f5be1313528 13,56,58-59,61-62,72-75,112-113,116-117,121,242-244,247-249,339-359,374,376,378-384,386-393,401-403,409-413,415-416,418-425,429-437,439-441,491,646-652,654,723-729,759-765,863
+src/targets/cursor.ts
+  7e52e8255e35406d 2,70
+src/targets/gemini.ts
+  7e52e8255e35406d 2,79
+src/targets/claude.ts
+  7e52e8255e35406d 2,59
+src/utils.ts
+  7ef0e5b4d894b376 477-481,523,530,532-546,548-549
+test/cli.test.mjs
+  ad1b0f5be1313528 8,202-223,407,475-601,603-713,1023-1048,1106-1137
+  b323dcc701c8a110 14,901-954,1168-1238
+  7ef0e5b4d894b376 602,714-900,955-1022,1049-1105,1138-1167,1239-1329
+  7e52e8255e35406d 4,334-405,408-474
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.2",
+  "base_commit_sha": "17f1586cb56d6b5d330860e7b0190f5a3c01fd00",
+  "prompts": {
+    "7e52e8255e35406d": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "6f62fb31-4725-4cc8-9e4c-1925df679d0d",
+        "model": "gpt-5.4-high"
+      },
+      "human_author": "sanxroz",
+      "messages": [],
+      "total_additions": 494,
+      "total_deletions": 43,
+      "accepted_lines": 419,
+      "overriden_lines": 0
+    },
+    "7ef0e5b4d894b376": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "86f880bb-5407-4a19-a2fd-02350bb5d5d2",
+        "model": "gpt-5.4-high"
+      },
+      "human_author": "sanxroz",
+      "messages": [],
+      "total_additions": 655,
+      "total_deletions": 94,
+      "accepted_lines": 634,
+      "overriden_lines": 0
+    },
+    "ad1b0f5be1313528": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "d08203f0-cbdc-4f6b-8ec9-4ae0cabf5ed5",
+        "model": "gpt-5.4-high"
+      },
+      "human_author": "sanxroz",
+      "messages": [],
+      "total_additions": 456,
+      "total_deletions": 32,
+      "accepted_lines": 431,
+      "overriden_lines": 0
+    },
+    "b323dcc701c8a110": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "e340d3a4-e74f-4022-bf96-0c0561803352",
+        "model": "gpt-5.4-high"
+      },
+      "human_author": "sanxroz",
+      "messages": [],
+      "total_additions": 155,
+      "total_deletions": 6,
+      "accepted_lines": 155,
+      "overriden_lines": 0
+    }
+  }
+}
