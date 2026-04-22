@@ -60,7 +60,11 @@ for (const name of selectedTargets) {
   if (dryRun) {
     console.log("  Would remove cubic skills/commands/MCP entries")
   } else {
-    await targets[name].uninstall(outputRoot)
+    try {
+      await targets[name].uninstall(outputRoot)
+    } catch (err) {
+      console.error(`  Warning: uninstall failed for ${name}: ${err.message ?? err}`)
+    }
   }
 
   const removedManifest = await removeManifest(outputRoot, name)

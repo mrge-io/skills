@@ -117,7 +117,7 @@ async function readTomlSectionBody(
     const content = await fs.readFile(filePath, "utf-8")
     const lines = content.split("\n")
     const headerPattern = new RegExp(
-      `^\\s*\\[${escapeRegExp(section)}\\]\\s*(?:#.*)?$`,
+      `^\\s*\\[\\s*${escapeRegExp(section)}\\s*\\]\\s*(?:#.*)?$`,
     )
     const anySectionPattern = /^\s*\[[^\]]+\]\s*(?:#.*)?$/
     const startIndex = lines.findIndex((line) => headerPattern.test(line))
@@ -277,7 +277,7 @@ async function fileHasTomlSectionAuthHeader(
   if (!httpHeaders) return false
   const escapedHeader = escapeRegExp(authHeader)
   const authPattern = new RegExp(
-    `\\bAuthorization\\b\\s*=\\s*"${escapedHeader}"`,
+    `\\bAuthorization\\b\\s*=\\s*(?:"${escapedHeader}"|'${escapedHeader}')`,
   )
   return authPattern.test(httpHeaders)
 }
@@ -365,14 +365,12 @@ function resolveManagedEntryPath(
   const resolvedPath = path.resolve(baseDir, relativePath)
   const relativeToBase = path.relative(baseDir, resolvedPath)
   if (
-    relativeToBase === ".."
+    !relativeToBase
+    || relativeToBase === ".."
     || relativeToBase.startsWith(`..${path.sep}`)
     || path.isAbsolute(relativeToBase)
   ) {
     return null
-  }
-  if (entry.type === "skill") {
-    return resolvedPath
   }
   return resolvedPath
 }
