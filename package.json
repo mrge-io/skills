@@ -1,6 +1,6 @@
 {
   "name": "@cubic-plugin/cubic-plugin",
-  "version": "1.3.2",
+  "version": "1.3.3-rc.2",
   "description": "Install cubic AI code review plugin for OpenCode",
   "type": "module",
   "bin": {
@@ -18,6 +18,8 @@
   ],
   "scripts": {
     "build": "tsc",
+    "clean:home": "npm run build && node scripts/clean-home-install.mjs",
+    "clean:home:dry-run": "npm run build && node scripts/clean-home-install.mjs --dry-run",
     "prepublishOnly": "npm run build",
     "test": "npm run build && node --test test/*.test.mjs"
   },

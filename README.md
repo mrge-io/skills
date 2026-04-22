@@ -42,7 +42,10 @@ npx @cubic-plugin/cubic-plugin install --to gemini
 npx @cubic-plugin/cubic-plugin install --to universal
 ```
 
-The installer will prompt you for your API key during setup.
+By default, installs go to the user's home directory under `~` using each tool's standard config location.
+If a target is already installed, the installer skips it; use `--force` to reinstall.
+
+The installer will prompt you for your API key during setup only when a target still needs MCP configuration.
 
 To uninstall, use the same `--to` flag:
 

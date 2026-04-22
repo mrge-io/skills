@@ -1,4 +1,5 @@
 import path from "path"
+import os from "os"
 import { promises as fs } from "fs"
 import type { Target, TargetResult } from "./index.js"
 import { authHeader } from "./index.js"
@@ -75,6 +76,6 @@ export const gemini: Target = {
   },
 
   defaultRoot(): string {
-    return path.join(process.cwd(), ".gemini")
+    return path.join(os.homedir(), ".gemini")
   },
 }

@@ -474,7 +474,11 @@ export async function installReviewCommand(
 
 // --- Manifest tracking ---
 
-export const MANIFEST_FILENAME = ".cubic-manifest.json"
+export const LEGACY_MANIFEST_FILENAME = ".cubic-manifest.json"
+
+export function manifestFilename(target: string): string {
+  return `.cubic-manifest.${target}.json`
+}
 
 export interface ManifestEntry {
   name: string
@@ -516,19 +520,31 @@ export async function writeManifest(
 ): Promise<void> {
   await fs.mkdir(outputRoot, { recursive: true })
   await fs.writeFile(
-    path.join(outputRoot, MANIFEST_FILENAME),
+    path.join(outputRoot, manifestFilename(manifest.target)),
     JSON.stringify(manifest, null, 2) + "\n",
   )
 }
 
 export async function readManifest(
   outputRoot: string,
+  target?: string,
 ): Promise<CubicManifest | null> {
-  const p = path.join(outputRoot, MANIFEST_FILENAME)
-  if (!(await pathExists(p))) return null
-  try {
-    return (await readJson(p)) as unknown as CubicManifest
-  } catch {
-    return null
+  const filenames = target
+    ? [manifestFilename(target), LEGACY_MANIFEST_FILENAME]
+    : [LEGACY_MANIFEST_FILENAME]
+
+  for (const filename of filenames) {
+    const manifestPath = path.join(outputRoot, filename)
+    if (!(await pathExists(manifestPath))) continue
+    try {
+      const manifest = (await readJson(manifestPath)) as unknown as CubicManifest
+      if (!target || manifest.target === target) {
+        return manifest
+      }
+    } catch {
+      continue
+    }
   }
+
+  return null
 }

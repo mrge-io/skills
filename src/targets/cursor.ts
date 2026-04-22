@@ -1,4 +1,5 @@
 import path from "path"
+import os from "os"
 import { promises as fs } from "fs"
 import type { Target, TargetResult } from "./index.js"
 import { authHeader } from "./index.js"
@@ -66,6 +67,6 @@ export const cursor: Target = {
   },
 
   defaultRoot(): string {
-    return path.join(process.cwd(), ".cursor")
+    return path.join(os.homedir(), ".cursor")
   },
 }
