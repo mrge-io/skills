@@ -168,6 +168,8 @@ describe("install --json error paths", () => {
 
   it("explains that json auth must come from the environment", async () => {
     const outDir = path.join(TMP_BASE, "json-auth-required")
+    const env = { ...process.env }
+    delete env.CUBIC_API_KEY
 
     try {
       await exec("node", [
@@ -178,7 +180,7 @@ describe("install --json error paths", () => {
         "claude",
         "-o",
         outDir,
-      ])
+      ], { env })
       assert.fail("should have exited with non-zero code")
     } catch (err) {
       assert.ok(err.code !== 0, "exit code should be non-zero")
@@ -355,6 +357,35 @@ describe("install text mode (backward compatibility)", () => {
       false,
       "should not suggest API key setup when auth was not needed",
     )
+  })
+
+  it("prints a failure message instead of success-style warnings when all targets fail", async () => {
+    const outDir = path.join(TMP_BASE, "text-mode-all-failed")
+    const configPath = path.join(outDir, "cursor", "mcp.json")
+
+    await mkdir(path.dirname(configPath), { recursive: true })
+    await writeFile(configPath, '{\n  "mcpServers": {\n    "cubic": \n')
+
+    try {
+      await exec("node", [
+        CLI,
+        "install",
+        "--to",
+        "cursor",
+        "-o",
+        outDir,
+      ], {
+        env: {
+          ...process.env,
+          CUBIC_API_KEY: "cbk_test_key",
+        },
+      })
+      assert.fail("should have exited with non-zero code")
+    } catch (err) {
+      assert.ok(err.code !== 0, "exit code should be non-zero")
+      assert.match(err.stdout || "", /Install failed\. No targets were installed\./)
+      assert.doesNotMatch(err.stdout || "", /Done with warnings/)
+    }
   })
 })
 

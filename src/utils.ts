@@ -54,6 +54,7 @@ export async function installFile(
       const message = err instanceof Error ? err.message : String(err)
       throw new Error(
         `Failed to create symlink at ${target} from ${source}: ${message}`,
+        { cause: err },
       )
     }
   } else {
@@ -63,6 +64,7 @@ export async function installFile(
       const message = err instanceof Error ? err.message : String(err)
       throw new Error(
         `Failed to copy file to ${target} from ${source}: ${message}`,
+        { cause: err },
       )
     }
   }
@@ -74,7 +76,9 @@ export async function readJson(p: string): Promise<Record<string, unknown>> {
     content = await fs.readFile(p, "utf-8")
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err)
-    throw new Error(`Failed to read JSON file at ${p}: ${message}`)
+    throw new Error(`Failed to read JSON file at ${p}: ${message}`, {
+      cause: err,
+    })
   }
 
   try {
@@ -83,6 +87,7 @@ export async function readJson(p: string): Promise<Record<string, unknown>> {
     const message = err instanceof Error ? err.message : String(err)
     throw new Error(
       `Invalid JSON in ${p}. Check for comments, trailing commas, or partial edits. ${message}`,
+      { cause: err },
     )
   }
 }

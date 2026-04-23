@@ -854,7 +854,9 @@ export default defineCommand({
       mcpServersTotal: results.reduce((s, r) => s + r.mcpServers, 0),
     })
 
-    if (failed.length > 0 && succeeded.length === 0) {
+    const allFailed = failed.length > 0 && succeeded.length === 0
+
+    if (allFailed) {
       emit({
         type: "install_failed",
         code: "TARGET_WRITE_FAILED",
@@ -869,10 +871,8 @@ export default defineCommand({
     }
 
     if (failed.length > 0) {
-      if (skillsOnly) {
-        console.log(
-          "\n✓ Done with warnings. Restart your editor to use the targets that installed successfully.",
-        )
+      if (allFailed) {
+        console.log("\nInstall failed. No targets were installed.")
       } else {
         console.log(
           "\n✓ Done with warnings. Restart your editor to use the targets that installed successfully.",
