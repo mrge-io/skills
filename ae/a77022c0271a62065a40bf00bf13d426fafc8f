@@ -1,0 +1,27 @@
+src/utils.ts
+  da8e7c5e7a95677b 57,67,79-81,90
+test/cli.test.mjs
+  da8e7c5e7a95677b 171-172,183,361-388
+src/install.ts
+  da8e7c5e7a95677b 857-859,874-875
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.4",
+  "base_commit_sha": "aea77022c0271a62065a40bf00bf13d426fafc8f",
+  "prompts": {
+    "da8e7c5e7a95677b": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "5e9c6968-a068-49f4-9737-ac036806a559",
+        "model": "gpt-5.4-high"
+      },
+      "human_author": "sanxroz",
+      "messages": [],
+      "total_additions": 43,
+      "total_deletions": 7,
+      "accepted_lines": 43,
+      "overriden_lines": 0
+    }
+  }
+}
