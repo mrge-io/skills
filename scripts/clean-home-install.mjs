@@ -64,6 +64,8 @@ for (const name of selectedTargets) {
       await targets[name].uninstall(outputRoot)
     } catch (err) {
       console.error(`  Warning: uninstall failed for ${name}: ${err.message ?? err}`)
+      process.exitCode = 1
+      continue
     }
   }
 
