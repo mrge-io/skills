@@ -140,6 +140,8 @@ describe("install --json --skills-only", () => {
 })
 
 describe("install --json error paths", () => {
+  after(cleanup)
+
   it("unknown target emits install_failed with UNKNOWN_TARGET", async () => {
     try {
       await exec("node", [
@@ -162,6 +164,141 @@ describe("install --json error paths", () => {
       assert.equal(failed.code, "UNKNOWN_TARGET")
       assert.equal(failed.retryable, false)
     }
+  })
+
+  it("explains that json auth must come from the environment", async () => {
+    const outDir = path.join(TMP_BASE, "json-auth-required")
+    const env = { ...process.env }
+    delete env.CUBIC_API_KEY
+
+    try {
+      await exec("node", [
+        CLI,
+        "install",
+        "--json",
+        "--to",
+        "claude",
+        "-o",
+        outDir,
+      ], { env })
+      assert.fail("should have exited with non-zero code")
+    } catch (err) {
+      assert.ok(err.code !== 0, "exit code should be non-zero")
+      const events = (err.stdout || "")
+        .trim()
+        .split("\n")
+        .filter((l) => l)
+        .map((l) => JSON.parse(l))
+
+      const warning = events.find((e) => e.type === "auth_warning")
+      assert.ok(warning)
+      assert.match(warning.message, /CUBIC_API_KEY/)
+      assert.match(warning.message, /stdin is not supported/i)
+
+      const failed = events.find((e) => e.type === "install_failed")
+      assert.ok(failed)
+      assert.equal(failed.code, "AUTH_REQUIRED")
+      assert.match(failed.message, /CUBIC_API_KEY/)
+      assert.match(failed.message, /stdin is not supported/i)
+    }
+  })
+
+  it("reports invalid existing JSON config with the failing path", async () => {
+    const outDir = path.join(TMP_BASE, "json-invalid-config")
+    const configPath = path.join(outDir, "cursor", "mcp.json")
+
+    await mkdir(path.dirname(configPath), { recursive: true })
+    await writeFile(configPath, '{\n  "mcpServers": {\n    "cubic": \n')
+
+    try {
+      await exec("node", [
+        CLI,
+        "install",
+        "--json",
+        "--to",
+        "cursor",
+        "-o",
+        outDir,
+      ], {
+        env: {
+          ...process.env,
+          CUBIC_API_KEY: "cbk_test_key",
+        },
+      })
+      assert.fail("should have exited with non-zero code")
+    } catch (err) {
+      assert.ok(err.code !== 0, "exit code should be non-zero")
+      const events = (err.stdout || "")
+        .trim()
+        .split("\n")
+        .filter((l) => l)
+        .map((l) => JSON.parse(l))
+
+      const result = events.find((e) => e.type === "target_result")
+      assert.ok(result)
+      assert.equal(result.agent, "cursor")
+      assert.equal(result.status, "failed")
+      assert.match(result.reason, /Invalid JSON/)
+      assert.match(result.reason, new RegExp(configPath.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")))
+
+      const failed = events.find((e) => e.type === "install_failed")
+      assert.ok(failed)
+      assert.equal(failed.code, "TARGET_WRITE_FAILED")
+      assert.match(failed.message, /^cursor failed: Invalid JSON/)
+      assert.match(failed.message, new RegExp(configPath.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")))
+    }
+  })
+
+  it("treats partial target failures as an overall success", async () => {
+    const outDir = path.join(TMP_BASE, "json-partial-success")
+    const cursorConfigPath = path.join(outDir, "cursor", "mcp.json")
+
+    await mkdir(path.dirname(cursorConfigPath), { recursive: true })
+    await writeFile(cursorConfigPath, '{\n  "mcpServers": {\n    "cubic": \n')
+
+    const { stdout } = await exec("node", [
+      CLI,
+      "install",
+      "--json",
+      "--to",
+      "all",
+      "-o",
+      outDir,
+    ], {
+      env: {
+        ...process.env,
+        CUBIC_API_KEY: "cbk_test_key",
+      },
+    })
+
+    const events = stdout
+      .trim()
+      .split("\n")
+      .filter((l) => l)
+      .map((l) => JSON.parse(l))
+
+    const cursorResult = events.find(
+      (e) => e.type === "target_result" && e.agent === "cursor",
+    )
+    assert.ok(cursorResult)
+    assert.equal(cursorResult.status, "failed")
+
+    const successResults = events.filter(
+      (e) => e.type === "target_result" && e.status === "ok",
+    )
+    assert.ok(successResults.length > 0, "other targets should still install")
+
+    const summary = events.find((e) => e.type === "install_summary")
+    assert.ok(summary)
+    assert.equal(summary.targetsTotal, 8)
+    assert.equal(summary.targetsFailed, 1)
+    assert.equal(summary.targetsSucceeded, 7)
+
+    const completed = events.find((e) => e.type === "install_completed")
+    assert.ok(completed, "partial success should still complete successfully")
+
+    const failed = events.find((e) => e.type === "install_failed")
+    assert.equal(failed, undefined, "partial success should not emit install_failed")
   })
 })
 
@@ -220,6 +357,35 @@ describe("install text mode (backward compatibility)", () => {
       false,
       "should not suggest API key setup when auth was not needed",
     )
+  })
+
+  it("prints a failure message instead of success-style warnings when all targets fail", async () => {
+    const outDir = path.join(TMP_BASE, "text-mode-all-failed")
+    const configPath = path.join(outDir, "cursor", "mcp.json")
+
+    await mkdir(path.dirname(configPath), { recursive: true })
+    await writeFile(configPath, '{\n  "mcpServers": {\n    "cubic": \n')
+
+    try {
+      await exec("node", [
+        CLI,
+        "install",
+        "--to",
+        "cursor",
+        "-o",
+        outDir,
+      ], {
+        env: {
+          ...process.env,
+          CUBIC_API_KEY: "cbk_test_key",
+        },
+      })
+      assert.fail("should have exited with non-zero code")
+    } catch (err) {
+      assert.ok(err.code !== 0, "exit code should be non-zero")
+      assert.match(err.stdout || "", /Install failed\. No targets were installed\./)
+      assert.doesNotMatch(err.stdout || "", /Done with warnings/)
+    }
   })
 })
 

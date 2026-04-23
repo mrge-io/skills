@@ -73,7 +73,7 @@ export async function promptForApiKey(
     emit({
       type: "auth_warning",
       message:
-        "JSON mode is non-interactive. Set CUBIC_API_KEY in the environment before running install.",
+        "JSON mode is non-interactive. Set CUBIC_API_KEY in the child process environment before running install. Passing the key over stdin is not supported.",
     })
     return undefined
   }

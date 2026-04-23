@@ -30,6 +30,22 @@ interface ResultEntry {
   reason: string | null
 }
 
+function summarizeFailedTargets(failed: ResultEntry[]): string {
+  if (failed.length === 1) {
+    const entry = failed[0]
+    return `${entry.agent} failed: ${entry.reason ?? "Unknown error"}`
+  }
+
+  const preview = failed
+    .slice(0, 2)
+    .map((entry) => `${entry.agent}: ${entry.reason ?? "Unknown error"}`)
+    .join("; ")
+  const remainder = failed.length - 2
+  return remainder > 0
+    ? `${failed.length} targets failed (${preview}; +${remainder} more)`
+    : `${failed.length} targets failed (${preview})`
+}
+
 function formatTargetLine(name: string, r: ResultEntry): string {
   if (r.reason === "already installed") {
     return `  ${name}: already installed`
@@ -678,7 +694,8 @@ export default defineCommand({
         emit({
           type: "install_failed",
           code: "AUTH_REQUIRED",
-          message: "JSON mode requires CUBIC_API_KEY in the environment",
+          message:
+            "JSON mode requires CUBIC_API_KEY in the environment. Passing the key over stdin is not supported.",
           retryable: true,
         })
         process.exitCode = 1
@@ -837,11 +854,13 @@ export default defineCommand({
       mcpServersTotal: results.reduce((s, r) => s + r.mcpServers, 0),
     })
 
-    if (failed.length > 0) {
+    const allFailed = failed.length > 0 && succeeded.length === 0
+
+    if (allFailed) {
       emit({
         type: "install_failed",
         code: "TARGET_WRITE_FAILED",
-        message: `${failed.length} target(s) failed`,
+        message: summarizeFailedTargets(failed),
         retryable: true,
       })
       process.exitCode = 1
@@ -851,7 +870,19 @@ export default defineCommand({
       if (jsonMode) return
     }
 
-    if (failed.length === 0) {
+    if (failed.length > 0) {
+      if (allFailed) {
+        console.log("\nInstall failed. No targets were installed.")
+      } else {
+        console.log(
+          "\n✓ Done with warnings. Restart your editor to use the targets that installed successfully.",
+        )
+      }
+      console.log("  Failed targets:")
+      for (const entry of failed) {
+        console.log(`    - ${entry.agent}: ${entry.reason ?? "Unknown error"}`)
+      }
+    } else {
       if (skipped.length === results.length) {
         console.log("\n✓ Already installed. Nothing changed.")
       } else if (skillsOnly) {

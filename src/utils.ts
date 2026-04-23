@@ -42,21 +42,54 @@ export async function installFile(
   method: InstallMethod,
 ): Promise<void> {
   if (method === "symlink") {
-    // Remove existing file/symlink before creating new one
-    try { await fs.unlink(target) } catch {}
-    // Resolve real paths to handle OS-level symlinks (e.g. macOS /var -> /private/var)
-    const realTargetDir = await fs.realpath(path.dirname(target))
-    const realSource = await fs.realpath(source)
-    const relative = path.relative(realTargetDir, realSource)
-    await fs.symlink(relative, target)
+    try {
+      // Remove existing file/symlink before creating new one
+      try { await fs.unlink(target) } catch {}
+      // Resolve real paths to handle OS-level symlinks (e.g. macOS /var -> /private/var)
+      const realTargetDir = await fs.realpath(path.dirname(target))
+      const realSource = await fs.realpath(source)
+      const relative = path.relative(realTargetDir, realSource)
+      await fs.symlink(relative, target)
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err)
+      throw new Error(
+        `Failed to create symlink at ${target} from ${source}: ${message}`,
+        { cause: err },
+      )
+    }
   } else {
-    await fs.copyFile(source, target)
+    try {
+      await fs.copyFile(source, target)
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err)
+      throw new Error(
+        `Failed to copy file to ${target} from ${source}: ${message}`,
+        { cause: err },
+      )
+    }
   }
 }
 
 export async function readJson(p: string): Promise<Record<string, unknown>> {
-  const content = await fs.readFile(p, "utf-8")
-  return JSON.parse(content)
+  let content: string
+  try {
+    content = await fs.readFile(p, "utf-8")
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err)
+    throw new Error(`Failed to read JSON file at ${p}: ${message}`, {
+      cause: err,
+    })
+  }
+
+  try {
+    return JSON.parse(content)
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err)
+    throw new Error(
+      `Invalid JSON in ${p}. Check for comments, trailing commas, or partial edits. ${message}`,
+      { cause: err },
+    )
+  }
 }
 
 export function parseFrontmatter(content: string): {
