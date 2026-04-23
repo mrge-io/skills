@@ -1,4 +1,5 @@
 import path from "path"
+import os from "os"
 import { promises as fs } from "fs"
 import type { Target, TargetResult } from "./index.js"
 import type { InstallMethod } from "../utils.js"
@@ -56,6 +57,6 @@ export const universal: Target = {
   },
 
   defaultRoot(): string {
-    return process.cwd()
+    return os.homedir()
   },
 }

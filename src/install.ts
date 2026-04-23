@@ -10,6 +10,7 @@ import {
   installReviewCommand,
   TARGET_LAYOUTS,
   readPluginVersion,
+  readManifest,
   writeManifest,
   type InstallMethod,
   type ManifestEntry,
@@ -30,12 +31,410 @@ interface ResultEntry {
 }
 
 function formatTargetLine(name: string, r: ResultEntry): string {
+  if (r.reason === "already installed") {
+    return `  ${name}: already installed`
+  }
   const parts = [`${r.skills} skills`]
   if (r.commands > 0) parts.push(`${r.commands} commands`)
   if (r.prompts > 0) parts.push(`${r.prompts} prompts`)
   if (r.mcpServers > 0)
     parts.push(`${r.mcpServers} MCP server${r.mcpServers !== 1 ? "s" : ""}`)
   return `  ${name}: ${parts.join(", ")}`
+}
+
+async function readJsonSectionEntry(
+  configPath: string,
+  section: string,
+  key: string,
+): Promise<Record<string, unknown> | null> {
+  if (!(await pathExists(configPath))) return null
+  try {
+    const content = JSON.parse(
+      await fs.readFile(configPath, "utf-8"),
+    ) as Record<string, unknown>
+    const value = content[section]
+    if (typeof value !== "object" || value === null || Array.isArray(value)) {
+      return null
+    }
+    const entry = (value as Record<string, unknown>)[key]
+    if (typeof entry === "object"
+      && entry !== null
+      && !Array.isArray(entry)
+      && Object.keys(entry).length > 0) {
+      return entry as Record<string, unknown>
+    }
+    return null
+  } catch {
+    return null
+  }
+}
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
+}
+
+function stripTomlLineComment(line: string): string {
+  let quote: '"' | "'" | null = null
+  let escaped = false
+
+  for (let i = 0; i < line.length; i++) {
+    const char = line[i]
+
+    if (escaped) {
+      escaped = false
+      continue
+    }
+
+    if (quote === '"' && char === "\\") {
+      escaped = true
+      continue
+    }
+
+    if (quote && char === quote) {
+      quote = null
+      continue
+    }
+
+    if (!quote && (char === '"' || char === "'")) {
+      quote = char
+      continue
+    }
+
+    if (!quote && char === "#") {
+      return line.slice(0, i).trimEnd()
+    }
+  }
+
+  return line.trimEnd()
+}
+
+async function readTomlSectionBody(
+  filePath: string,
+  section: string,
+): Promise<string | null> {
+  if (!(await pathExists(filePath))) return null
+  try {
+    const content = await fs.readFile(filePath, "utf-8")
+    const lines = content.split("\n")
+    const headerPattern = new RegExp(
+      `^\\s*\\[\\s*${escapeRegExp(section)}\\s*\\]\\s*(?:#.*)?$`,
+    )
+    const anySectionPattern = /^\s*\[[^\]]+\]\s*(?:#.*)?$/
+    const startIndex = lines.findIndex((line) => headerPattern.test(line))
+    if (startIndex === -1) return null
+
+    const sectionLines: string[] = []
+    for (let i = startIndex + 1; i < lines.length; i++) {
+      if (anySectionPattern.test(lines[i])) break
+      sectionLines.push(lines[i])
+    }
+
+    return sectionLines.join("\n")
+  } catch {
+    return null
+  }
+}
+
+async function readActiveTomlSectionBody(
+  filePath: string,
+  section: string,
+): Promise<string | null> {
+  const sectionBody = await readTomlSectionBody(filePath, section)
+  if (!sectionBody) return null
+
+  const activeLines = sectionBody
+    .split("\n")
+    .map(stripTomlLineComment)
+    .filter((line) => line.trim().length > 0)
+
+  return activeLines.length > 0 ? activeLines.join("\n") : null
+}
+
+function readTomlInlineTableBody(
+  sectionBody: string,
+  key: string,
+): string | null {
+  const inlineTablePattern = new RegExp(
+    `(^|\\n)\\s*${escapeRegExp(key)}\\s*=\\s*\\{([^\\n]*)\\}(?=\\n|$)`,
+  )
+  const match = sectionBody.match(inlineTablePattern)
+  return match ? match[2] : null
+}
+
+async function jsonSectionHasMcpConfig(
+  configPath: string,
+  section: string,
+  key: string,
+): Promise<boolean> {
+  const entry = await readJsonSectionEntry(configPath, section, key)
+  if (!entry) return false
+  const endpoint = typeof entry.url === "string"
+    ? entry.url
+    : typeof entry.baseUrl === "string"
+    ? entry.baseUrl
+    : undefined
+  const headers = entry.headers
+  const authHeader = typeof headers === "object"
+    && headers !== null
+    && !Array.isArray(headers)
+    ? (headers as Record<string, unknown>).Authorization
+    : undefined
+  return typeof endpoint === "string"
+    && endpoint.length > 0
+    && typeof authHeader === "string"
+    && authHeader.length > 0
+}
+
+async function fileHasTomlMcpConfig(
+  filePath: string,
+  section: string,
+): Promise<boolean> {
+  const sectionBody = await readActiveTomlSectionBody(filePath, section)
+  if (!sectionBody) return false
+  const httpHeaders = readTomlInlineTableBody(sectionBody, "http_headers")
+  return /(^|\n)\s*url\s*=/.test(sectionBody)
+    && httpHeaders !== null
+    && /\bAuthorization\b\s*=/.test(httpHeaders)
+}
+
+function targetNeedsApiKey(name: string): boolean {
+  return name !== "universal"
+}
+
+async function targetHasMcpConfig(
+  name: string,
+  outputRoot: string,
+): Promise<boolean> {
+  switch (name) {
+    case "claude":
+      return jsonSectionHasMcpConfig(
+        path.join(outputRoot, ".mcp.json"),
+        "mcpServers",
+        "cubic",
+      )
+    case "cursor":
+    case "droid":
+      return jsonSectionHasMcpConfig(
+        path.join(outputRoot, "mcp.json"),
+        "mcpServers",
+        "cubic",
+      )
+    case "gemini":
+      return jsonSectionHasMcpConfig(
+        path.join(outputRoot, "settings.json"),
+        "mcpServers",
+        "cubic",
+      )
+    case "opencode":
+      return jsonSectionHasMcpConfig(
+        path.join(outputRoot, "opencode.json"),
+        "mcp",
+        "cubic",
+      )
+    case "pi":
+      return jsonSectionHasMcpConfig(
+        path.join(outputRoot, "cubic", "mcporter.json"),
+        "mcpServers",
+        "cubic",
+      )
+    case "codex":
+      return fileHasTomlMcpConfig(
+        path.join(outputRoot, "config.toml"),
+        "mcp_servers.cubic",
+      )
+    default:
+      return false
+  }
+}
+
+function expectedAuthHeader(apiKey: string): string {
+  return `Bearer ${apiKey}`
+}
+
+async function jsonSectionHasAuthHeader(
+  configPath: string,
+  section: string,
+  key: string,
+  authHeader: string,
+): Promise<boolean> {
+  const entry = await readJsonSectionEntry(configPath, section, key)
+  if (!entry) return false
+  const headers = entry.headers
+  if (typeof headers !== "object" || headers === null || Array.isArray(headers)) {
+    return false
+  }
+  return (headers as Record<string, unknown>).Authorization === authHeader
+}
+
+async function fileHasTomlSectionAuthHeader(
+  filePath: string,
+  section: string,
+  authHeader: string,
+): Promise<boolean> {
+  const sectionBody = await readActiveTomlSectionBody(filePath, section)
+  if (!sectionBody) return false
+  const httpHeaders = readTomlInlineTableBody(sectionBody, "http_headers")
+  if (!httpHeaders) return false
+  const escapedHeader = escapeRegExp(authHeader)
+  const authPattern = new RegExp(
+    `\\bAuthorization\\b\\s*=\\s*(?:"${escapedHeader}"|'${escapedHeader}')`,
+  )
+  return authPattern.test(httpHeaders)
+}
+
+async function targetHasApiKey(
+  name: string,
+  outputRoot: string,
+  apiKey: string,
+): Promise<boolean> {
+  const authHeader = expectedAuthHeader(apiKey)
+  switch (name) {
+    case "claude":
+      return jsonSectionHasAuthHeader(
+        path.join(outputRoot, ".mcp.json"),
+        "mcpServers",
+        "cubic",
+        authHeader,
+      )
+    case "cursor":
+    case "droid":
+      return jsonSectionHasAuthHeader(
+        path.join(outputRoot, "mcp.json"),
+        "mcpServers",
+        "cubic",
+        authHeader,
+      )
+    case "gemini":
+      return jsonSectionHasAuthHeader(
+        path.join(outputRoot, "settings.json"),
+        "mcpServers",
+        "cubic",
+        authHeader,
+      )
+    case "opencode":
+      return jsonSectionHasAuthHeader(
+        path.join(outputRoot, "opencode.json"),
+        "mcp",
+        "cubic",
+        authHeader,
+      )
+    case "pi":
+      return jsonSectionHasAuthHeader(
+        path.join(outputRoot, "cubic", "mcporter.json"),
+        "mcpServers",
+        "cubic",
+        authHeader,
+      )
+    case "codex":
+      return fileHasTomlSectionAuthHeader(
+        path.join(outputRoot, "config.toml"),
+        "mcp_servers.cubic",
+        authHeader,
+      )
+    default:
+      return false
+  }
+}
+
+function manifestEntryKey(entry: ManifestEntry): string {
+  return `${entry.type}:${entry.name}:${entry.file}:${entry.method}`
+}
+
+function manifestEntriesMatch(
+  actual: ManifestEntry[],
+  expected: ManifestEntry[],
+): boolean {
+  if (actual.length !== expected.length) return false
+  const actualKeys = actual.map(manifestEntryKey).sort()
+  const expectedKeys = expected.map(manifestEntryKey).sort()
+  return actualKeys.every((key, index) => key === expectedKeys[index])
+}
+
+function resolveManagedEntryPath(
+  name: string,
+  outputRoot: string,
+  entry: ManifestEntry,
+): string | null {
+  const layout = TARGET_LAYOUTS[name]
+  if (!layout || entry.type === "mcp-config") return null
+  const baseDir = entry.type === "skill"
+    ? layout.skillsDir(outputRoot)
+    : layout.commandDir(outputRoot)
+  const relativePath = entry.type === "skill" ? entry.name : entry.file
+  if (path.isAbsolute(relativePath)) return null
+  const resolvedPath = path.resolve(baseDir, relativePath)
+  const relativeToBase = path.relative(baseDir, resolvedPath)
+  if (
+    !relativeToBase
+    || relativeToBase === ".."
+    || relativeToBase.startsWith(`..${path.sep}`)
+    || path.isAbsolute(relativeToBase)
+  ) {
+    return null
+  }
+  return resolvedPath
+}
+
+async function cleanupObsoleteManagedEntries(
+  name: string,
+  outputRoot: string,
+  expectedEntries: ManifestEntry[],
+): Promise<void> {
+  const manifest = await readManifest(outputRoot, name)
+  if (!manifest) return
+
+  const expectedKeys = new Set(expectedEntries.map(manifestEntryKey))
+  for (const entry of manifest.entries) {
+    if (expectedKeys.has(manifestEntryKey(entry))) continue
+    const managedPath = resolveManagedEntryPath(name, outputRoot, entry)
+    if (!managedPath) continue
+    await fs.rm(managedPath, { recursive: true, force: true })
+  }
+}
+
+async function isTargetAlreadyInstalled(
+  name: string,
+  outputRoot: string,
+  skillsOnly: boolean,
+  pluginRoot: string,
+  pluginVersion: string,
+  method: InstallMethod,
+  apiKeyHint?: string,
+): Promise<boolean> {
+  const layout = TARGET_LAYOUTS[name]
+  if (!layout) return false
+
+  const expectedEntries = await buildManifestEntries(
+    pluginRoot,
+    name,
+    skillsOnly,
+    method,
+  )
+  if (expectedEntries.length === 0) return false
+
+  const manifest = await readManifest(outputRoot, name)
+  if (!manifest) return false
+  if (manifest.pluginVersion !== pluginVersion) return false
+  if (manifest.method !== method) return false
+  if (!manifestEntriesMatch(manifest.entries, expectedEntries)) return false
+
+  for (const entry of expectedEntries) {
+    if (entry.type === "mcp-config") {
+      if (!(await targetHasMcpConfig(name, outputRoot))) return false
+      if (apiKeyHint && !(await targetHasApiKey(name, outputRoot, apiKeyHint))) {
+        return false
+      }
+      continue
+    }
+
+    const entryPath = entry.type === "skill"
+      ? path.join(layout.skillsDir(outputRoot), entry.name, "SKILL.md")
+      : path.join(layout.commandDir(outputRoot), entry.file)
+
+    if (!(await pathExists(entryPath))) return false
+  }
+
+  return true
 }
 
 async function buildManifestEntries(
@@ -87,7 +486,7 @@ async function buildManifestEntries(
   }
 
   // MCP config (only for full installs)
-  if (!skillsOnly) {
+  if (!skillsOnly && targetNeedsApiKey(targetName)) {
     entries.push({
       name: "cubic",
       type: "mcp-config",
@@ -131,6 +530,11 @@ export default defineCommand({
       default: "paste",
       description: 'Installation method: "paste" (copy files) or "symlink" (create symlinks)',
     },
+    force: {
+      type: "boolean",
+      default: false,
+      description: "Reinstall even if cubic is already installed",
+    },
   },
   async run({ args }) {
     const jsonMode = Boolean(args.json)
@@ -140,6 +544,10 @@ export default defineCommand({
       targetName === "all" ? TARGET_NAMES : [targetName]
     const skillsOnly = Boolean(args["skills-only"])
     const method = String(args.method) as InstallMethod
+    const force = Boolean(args.force)
+    const envApiKey = process.env.CUBIC_API_KEY?.startsWith("cbk_")
+      ? process.env.CUBIC_API_KEY
+      : undefined
 
     if (method !== "paste" && method !== "symlink") {
       const msg = `Unknown method: ${method}. Available: paste, symlink`
@@ -174,36 +582,6 @@ export default defineCommand({
     }
 
     // install_started is emitted after resolvePluginRoot so we have pluginVersion
-
-    let apiKey: string | undefined
-    if (!skillsOnly) {
-      try {
-        apiKey = await promptForApiKey(emit, jsonMode)
-      } catch (err) {
-        if (jsonMode) {
-          const message = err instanceof Error ? err.message : String(err)
-          emit({
-            type: "install_failed",
-            code: "AUTH_FAILED",
-            message,
-            retryable: true,
-          })
-          process.exitCode = 1
-          return
-        }
-        throw err
-      }
-      if (jsonMode && !apiKey) {
-        emit({
-          type: "install_failed",
-          code: "AUTH_REQUIRED",
-          message: "JSON mode requires CUBIC_API_KEY in the environment",
-          retryable: true,
-        })
-        process.exitCode = 1
-        return
-      }
-    }
 
     let pluginRoot: string
     let sourcePluginRoot: string
@@ -256,6 +634,58 @@ export default defineCommand({
 
     const results: ResultEntry[] = []
 
+    const installPlans = await Promise.all(
+      selectedTargets.map(async (name) => {
+        const target = targets[name]
+        const outputRoot = args.output
+          ? path.resolve(String(args.output), name)
+          : target.defaultRoot()
+        const alreadyInstalled = !force
+          && await isTargetAlreadyInstalled(
+            name,
+            outputRoot,
+            skillsOnly,
+            pluginRoot,
+            pluginVersion,
+            method,
+            envApiKey,
+          )
+        return { name, outputRoot, alreadyInstalled }
+      }),
+    )
+
+    let apiKey: string | undefined
+    const needsAuth = !skillsOnly
+      && installPlans.some((plan) => !plan.alreadyInstalled && targetNeedsApiKey(plan.name))
+    if (needsAuth) {
+      try {
+        apiKey = await promptForApiKey(emit, jsonMode)
+      } catch (err) {
+        if (jsonMode) {
+          const message = err instanceof Error ? err.message : String(err)
+          emit({
+            type: "install_failed",
+            code: "AUTH_FAILED",
+            message,
+            retryable: true,
+          })
+          process.exitCode = 1
+          return
+        }
+        throw err
+      }
+      if (jsonMode && !apiKey) {
+        emit({
+          type: "install_failed",
+          code: "AUTH_REQUIRED",
+          message: "JSON mode requires CUBIC_API_KEY in the environment",
+          retryable: true,
+        })
+        process.exitCode = 1
+        return
+      }
+    }
+
     try {
       if (!skillsOnly && apiKey && (await pathExists(mcpPath))) {
         originalMcp = await fs.readFile(mcpPath, "utf-8")
@@ -267,11 +697,9 @@ export default defineCommand({
         )
       }
 
-      for (const name of selectedTargets) {
+      for (const plan of installPlans) {
+        const { name, outputRoot, alreadyInstalled } = plan
         const target = targets[name]
-        const outputRoot = args.output
-          ? path.resolve(String(args.output), name)
-          : target.defaultRoot()
         await fs.mkdir(outputRoot, { recursive: true })
 
         emit({ type: "target_started", agent: name })
@@ -279,7 +707,24 @@ export default defineCommand({
         try {
           let entry: ResultEntry
 
-          if (skillsOnly) {
+          if (alreadyInstalled) {
+            entry = {
+              agent: name,
+              skills: 0,
+              commands: 0,
+              prompts: 0,
+              mcpServers: 0,
+              status: "ok",
+              reason: "already installed",
+            }
+          } else if (skillsOnly) {
+            const expectedEntries = await buildManifestEntries(
+              pluginRoot,
+              name,
+              skillsOnly,
+              method,
+            )
+            await cleanupObsoleteManagedEntries(name, outputRoot, expectedEntries)
             const layout = TARGET_LAYOUTS[name]
             if (!layout) {
               throw new Error(
@@ -309,6 +754,13 @@ export default defineCommand({
               reason: null,
             }
           } else {
+            const expectedEntries = await buildManifestEntries(
+              pluginRoot,
+              name,
+              skillsOnly,
+              method,
+            )
+            await cleanupObsoleteManagedEntries(name, outputRoot, expectedEntries)
             const tr = await target.install(pluginRoot, outputRoot, apiKey, method)
             entry = {
               agent: name,
@@ -321,7 +773,7 @@ export default defineCommand({
           emit({ type: "target_result", method, ...entry })
 
           // Write manifest for this target
-          if (entry.status === "ok") {
+          if (entry.status === "ok" && entry.reason !== "already installed") {
             const manifestEntries = await buildManifestEntries(pluginRoot, name, skillsOnly, method)
             const manifest: CubicManifest = {
               manifestVersion: 1,
@@ -336,7 +788,9 @@ export default defineCommand({
           }
 
           if (!jsonMode) {
-            if (skillsOnly) {
+            if (entry.reason === "already installed") {
+              console.log(formatTargetLine(name, entry))
+            } else if (skillsOnly) {
               console.log(`  ${name}: ${entry.skills} skill, ${entry.commands} command (skills only)`)
             } else {
               console.log(formatTargetLine(name, entry))
@@ -369,6 +823,7 @@ export default defineCommand({
 
     const succeeded = results.filter((r) => r.status === "ok")
     const failed = results.filter((r) => r.status === "failed")
+    const skipped = succeeded.filter((r) => r.reason === "already installed")
 
     emit({
       type: "install_summary",
@@ -397,11 +852,13 @@ export default defineCommand({
     }
 
     if (failed.length === 0) {
-      if (skillsOnly) {
+      if (skipped.length === results.length) {
+        console.log("\n✓ Already installed. Nothing changed.")
+      } else if (skillsOnly) {
         console.log(
           "\n✓ Done! Restart your editor to start using cubic skills.",
         )
-      } else if (apiKey) {
+      } else if (!needsAuth || apiKey) {
         console.log("\n✓ Done! Restart your editor to start using cubic.")
       } else {
         console.log("\nNext steps:")
