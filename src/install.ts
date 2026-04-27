@@ -6,8 +6,8 @@ import {
   inlineApiKey,
   resolvePluginRoot,
   resolveInstallPluginRoot,
-  installReviewSkill,
-  installReviewCommand,
+  installSkills,
+  installAllCommands,
   TARGET_LAYOUTS,
   readPluginVersion,
   readManifest,
@@ -469,8 +469,6 @@ async function buildManifestEntries(
     for (const d of dirs) {
       if (!d.isDirectory()) continue
       if (await pathExists(path.join(skillsSource, d.name, "SKILL.md"))) {
-        // For skills-only mode, only run-review is installed
-        if (skillsOnly && d.name !== "run-review") continue
         entries.push({
           name: d.name,
           type: "skill",
@@ -487,8 +485,6 @@ async function buildManifestEntries(
     const files = await fs.readdir(cmdsSource)
     for (const file of files) {
       if (!file.endsWith(".md")) continue
-      // For skills-only mode, only run-review command is installed
-      if (skillsOnly && !file.includes("run-review")) continue
       const outName = layout ? layout.commandFilename(file) : file
       // Commands with format transforms (stripped/toml) are always copied, not symlinked
       const cmdMethod = layout && layout.commandFormat !== "original" ? "paste" as InstallMethod : method
@@ -748,19 +744,17 @@ export default defineCommand({
                 `No skills-only layout defined for target: ${name}. Add an entry to TARGET_LAYOUTS.`,
               )
             }
-            const skillInstalled = await installReviewSkill(
+            const skills = await installSkills(
               pluginRoot,
               layout.skillsDir(outputRoot),
               method,
             )
-            const commandInstalled = await installReviewCommand(
+            const commands = await installAllCommands(
               pluginRoot,
               layout.commandDir(outputRoot),
               layout,
               method,
             )
-            const skills = skillInstalled ? 1 : 0
-            const commands = commandInstalled ? 1 : 0
             entry = {
               agent: name,
               skills,
@@ -805,13 +799,7 @@ export default defineCommand({
           }
 
           if (!jsonMode) {
-            if (entry.reason === "already installed") {
-              console.log(formatTargetLine(name, entry))
-            } else if (skillsOnly) {
-              console.log(`  ${name}: ${entry.skills} skill, ${entry.commands} command (skills only)`)
-            } else {
-              console.log(formatTargetLine(name, entry))
-            }
+            console.log(formatTargetLine(name, entry))
           }
         } catch (err) {
           const reason = err instanceof Error ? err.message : String(err)
