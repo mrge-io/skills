@@ -478,30 +478,17 @@ export const TARGET_LAYOUTS: Record<string, TargetLayout> = {
 }
 
 
-export async function installReviewSkill(
-  pluginRoot: string,
-  skillsDir: string,
-  method: InstallMethod = "paste",
-): Promise<boolean> {
-  const source = path.join(pluginRoot, "skills", "run-review", "SKILL.md")
-  if (!(await pathExists(source))) return false
-  const targetDir = path.join(skillsDir, "run-review")
-  await fs.mkdir(targetDir, { recursive: true })
-  await installFile(source, path.join(targetDir, "SKILL.md"), method)
-  return true
-}
-
-export async function installReviewCommand(
+async function installCommandFile(
   pluginRoot: string,
   commandDir: string,
   layout: TargetLayout,
-  method: InstallMethod = "paste",
+  sourceFilename: string,
+  method: InstallMethod,
 ): Promise<boolean> {
-  const source = path.join(pluginRoot, "commands", "run-review.md")
+  const source = path.join(pluginRoot, "commands", sourceFilename)
   if (!(await pathExists(source))) return false
-  await fs.mkdir(commandDir, { recursive: true })
 
-  const targetFilename = layout.commandFilename("run-review.md")
+  const targetFilename = layout.commandFilename(sourceFilename)
 
   if (layout.commandFormat === "original") {
     await installFile(source, path.join(commandDir, targetFilename), method)
@@ -530,6 +517,27 @@ export async function installReviewCommand(
     await fs.writeFile(path.join(commandDir, targetFilename), toml)
   }
   return true
+}
+
+export async function installAllCommands(
+  pluginRoot: string,
+  commandDir: string,
+  layout: TargetLayout,
+  method: InstallMethod = "paste",
+): Promise<number> {
+  const cmdSource = path.join(pluginRoot, "commands")
+  if (!(await pathExists(cmdSource))) return 0
+
+  await fs.mkdir(commandDir, { recursive: true })
+
+  let count = 0
+  for (const file of await fs.readdir(cmdSource)) {
+    if (!file.endsWith(".md")) continue
+    if (await installCommandFile(pluginRoot, commandDir, layout, file, method)) {
+      count++
+    }
+  }
+  return count
 }
 
 // --- Manifest tracking ---

@@ -52,8 +52,8 @@ describe("install --json --skills-only", () => {
     assert.ok(result)
     assert.equal(result.agent, "claude")
     assert.equal(result.status, "ok")
-    assert.equal(result.skills, 1)
-    assert.equal(result.commands, 1)
+    assert.equal(result.skills, 5)
+    assert.equal(result.commands, 5)
     assert.equal(result.mcpServers, 0)
 
     const summary = events.find((e) => e.type === "install_summary")
@@ -96,8 +96,8 @@ describe("install --json --skills-only", () => {
 
     const summary = events.find((e) => e.type === "install_summary")
     assert.equal(summary.targetsTotal, 8)
-    assert.equal(summary.skillsTotal, 8)
-    assert.equal(summary.commandsTotal, 8)
+    assert.equal(summary.skillsTotal, 40)
+    assert.equal(summary.commandsTotal, 40)
   })
 
   it("each NDJSON line is valid JSON parseable by jq", async () => {
@@ -319,7 +319,7 @@ describe("install text mode (backward compatibility)", () => {
 
     assert.ok(stdout.includes("Installing cubic skills"), "has progress text")
     assert.ok(
-      stdout.includes("claude: 1 skill, 1 command"),
+      stdout.includes("claude: 5 skills, 5 commands"),
       "has target summary",
     )
     assert.ok(stdout.includes("Done!"), "has completion message")
