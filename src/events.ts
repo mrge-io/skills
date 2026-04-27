@@ -44,6 +44,12 @@ export interface TargetStartedEvent {
   agent: string
 }
 
+export interface TargetSkippedEvent {
+  type: "target_skipped"
+  agent: string
+  reason: "not_detected"
+}
+
 export interface TargetResultEvent {
   type: "target_result"
   agent: string
@@ -88,6 +94,7 @@ export type InstallEvent =
   | AuthSuccessEvent
   | AuthWarningEvent
   | TargetStartedEvent
+  | TargetSkippedEvent
   | TargetResultEvent
   | InstallSummaryEvent
   | InstallCompletedEvent
