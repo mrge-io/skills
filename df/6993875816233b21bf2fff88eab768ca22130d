@@ -1,0 +1,27 @@
+src/install.ts
+  a4c2ef760ed7569d 9-10,747,752,802
+src/utils.ts
+  a4c2ef760ed7569d 454,458-459,461,464,495-513
+test/cli.test.mjs
+  a4c2ef760ed7569d 55-56,99-100,322
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.4",
+  "base_commit_sha": "df6993875816233b21bf2fff88eab768ca22130d",
+  "prompts": {
+    "a4c2ef760ed7569d": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "b0b0890a-5a10-4d43-b053-c68535ec419a",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "sanxroz",
+      "messages": [],
+      "total_additions": 36,
+      "total_deletions": 40,
+      "accepted_lines": 36,
+      "overriden_lines": 0
+    }
+  }
+}
