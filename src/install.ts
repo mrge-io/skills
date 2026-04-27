@@ -8,6 +8,8 @@ import {
   resolveInstallPluginRoot,
   installReviewSkill,
   installReviewCommand,
+  isAgentDetected,
+  AGENT_MARKERS,
   TARGET_LAYOUTS,
   readPluginVersion,
   readManifest,
@@ -556,7 +558,10 @@ export default defineCommand({
     const jsonMode = Boolean(args.json)
     const emit = createEmitter(jsonMode)
     const targetName = String(args.to)
-    const selectedTargets =
+    const explicitTarget = targetName !== "all"
+    const customOutput = Boolean(args.output)
+    const autoDetect = !explicitTarget && !customOutput
+    const initialTargets =
       targetName === "all" ? TARGET_NAMES : [targetName]
     const skillsOnly = Boolean(args["skills-only"])
     const method = String(args.method) as InstallMethod
@@ -580,7 +585,7 @@ export default defineCommand({
       throw new Error(msg)
     }
 
-    for (const name of selectedTargets) {
+    for (const name of initialTargets) {
       if (!targets[name]) {
         const msg = `Unknown target: ${name}. Available: ${TARGET_NAMES.join(", ")}, all`
         if (jsonMode) {
@@ -594,6 +599,21 @@ export default defineCommand({
           return
         }
         throw new Error(msg)
+      }
+    }
+
+    let selectedTargets = initialTargets
+    const skippedTargets: string[] = []
+    if (autoDetect) {
+      const detections = await Promise.all(
+        initialTargets.map(async (name) => ({
+          name,
+          detected: await isAgentDetected(name),
+        })),
+      )
+      selectedTargets = detections.filter((d) => d.detected).map((d) => d.name)
+      for (const { name, detected } of detections) {
+        if (!detected) skippedTargets.push(name)
       }
     }
 
@@ -647,6 +667,13 @@ export default defineCommand({
           : "Installing cubic plugin...\n",
       )
     }
+
+    for (const name of skippedTargets) {
+      emit({ type: "target_skipped", agent: name, reason: "not_detected" })
+      if (!jsonMode) console.log(`  ${name}: skipped (agent not detected)`)
+    }
+
+    const noneDetected = autoDetect && selectedTargets.length === 0
 
     const results: ResultEntry[] = []
 
@@ -883,7 +910,16 @@ export default defineCommand({
         console.log(`    - ${entry.agent}: ${entry.reason ?? "Unknown error"}`)
       }
     } else {
-      if (skipped.length === results.length) {
+      if (noneDetected) {
+        const agents = Object.keys(AGENT_MARKERS).join(", ")
+        console.log(
+          "\nNo supported AI coding tools detected in your home directory.",
+        )
+        console.log(`  Install one of: ${agents}.`)
+        console.log(
+          "  Or run with --to <target> to install anyway, or --to universal for the generic layout.",
+        )
+      } else if (skipped.length === results.length && results.length > 0) {
         console.log("\n✓ Already installed. Nothing changed.")
       } else if (skillsOnly) {
         console.log(

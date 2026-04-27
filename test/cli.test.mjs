@@ -1494,3 +1494,256 @@ describe("install skip behavior", () => {
     assert.equal(result.reason, "already installed")
   })
 })
+
+describe("install agent auto-detection", () => {
+  after(cleanup)
+
+  it("skips targets whose agent is not detected when --to all uses default paths", async () => {
+    const homeDir = path.join(TMP_BASE, "auto-detect-only-claude")
+    await mkdir(path.join(homeDir, ".claude"), { recursive: true })
+
+    const { stdout } = await exec("node", [
+      CLI,
+      "install",
+      "--json",
+      "--skills-only",
+      "--to",
+      "all",
+    ], {
+      env: {
+        ...process.env,
+        HOME: homeDir,
+      },
+    })
+
+    const events = stdout
+      .trim()
+      .split("\n")
+      .filter((line) => line)
+      .map((line) => JSON.parse(line))
+
+    const skipped = events.filter((event) => event.type === "target_skipped")
+    const skippedAgents = skipped.map((event) => event.agent).sort()
+    assert.deepEqual(
+      skippedAgents,
+      ["codex", "cursor", "droid", "gemini", "opencode", "pi", "universal"],
+    )
+    for (const event of skipped) {
+      assert.equal(event.reason, "not_detected")
+    }
+
+    const results = events.filter((event) => event.type === "target_result")
+    assert.equal(results.length, 1)
+    assert.equal(results[0].agent, "claude")
+    assert.equal(results[0].status, "ok")
+
+    const summary = events.find((event) => event.type === "install_summary")
+    assert.equal(summary.targetsTotal, 1)
+    assert.equal(summary.targetsSucceeded, 1)
+  })
+
+  it("emits a clean completion when no agents are detected", async () => {
+    const homeDir = path.join(TMP_BASE, "auto-detect-none")
+    await mkdir(homeDir, { recursive: true })
+
+    const { stdout } = await exec("node", [
+      CLI,
+      "install",
+      "--json",
+      "--skills-only",
+      "--to",
+      "all",
+    ], {
+      env: {
+        ...process.env,
+        HOME: homeDir,
+      },
+    })
+
+    const events = stdout
+      .trim()
+      .split("\n")
+      .filter((line) => line)
+      .map((line) => JSON.parse(line))
+
+    const skipped = events.filter((event) => event.type === "target_skipped")
+    assert.equal(skipped.length, 8, "every target should be skipped")
+
+    const results = events.filter((event) => event.type === "target_result")
+    assert.equal(results.length, 0)
+
+    const summary = events.find((event) => event.type === "install_summary")
+    assert.ok(summary)
+    assert.equal(summary.targetsTotal, 0)
+
+    const completed = events.find((event) => event.type === "install_completed")
+    assert.ok(completed)
+    assert.equal(completed.ok, true)
+  })
+
+  it("does not skip when the user names a specific target explicitly", async () => {
+    const homeDir = path.join(TMP_BASE, "auto-detect-explicit")
+    await mkdir(homeDir, { recursive: true })
+
+    const { stdout } = await exec("node", [
+      CLI,
+      "install",
+      "--json",
+      "--skills-only",
+      "--to",
+      "cursor",
+    ], {
+      env: {
+        ...process.env,
+        HOME: homeDir,
+      },
+    })
+
+    const events = stdout
+      .trim()
+      .split("\n")
+      .filter((line) => line)
+      .map((line) => JSON.parse(line))
+
+    const skipped = events.filter((event) => event.type === "target_skipped")
+    assert.equal(skipped.length, 0, "explicit --to should bypass detection")
+
+    const result = events.find((event) => event.type === "target_result")
+    assert.ok(result)
+    assert.equal(result.agent, "cursor")
+    assert.equal(result.status, "ok")
+  })
+
+  it("does not skip when --output is provided, even with --to all", async () => {
+    const homeDir = path.join(TMP_BASE, "auto-detect-with-output-home")
+    await mkdir(homeDir, { recursive: true })
+    const outDir = path.join(TMP_BASE, "auto-detect-with-output")
+
+    const { stdout } = await exec("node", [
+      CLI,
+      "install",
+      "--json",
+      "--skills-only",
+      "--to",
+      "all",
+      "-o",
+      outDir,
+    ], {
+      env: {
+        ...process.env,
+        HOME: homeDir,
+      },
+    })
+
+    const events = stdout
+      .trim()
+      .split("\n")
+      .filter((line) => line)
+      .map((line) => JSON.parse(line))
+
+    const skipped = events.filter((event) => event.type === "target_skipped")
+    assert.equal(skipped.length, 0, "--output should bypass detection")
+
+    const results = events.filter((event) => event.type === "target_result")
+    assert.equal(results.length, 8, "all targets should run when -o is set")
+  })
+
+  it("auto-detection also applies to full installs (mcp + skills)", async () => {
+    const homeDir = path.join(TMP_BASE, "auto-detect-full-only-codex")
+    await mkdir(path.join(homeDir, ".codex"), { recursive: true })
+
+    const { stdout } = await exec("node", [
+      CLI,
+      "install",
+      "--json",
+      "--to",
+      "all",
+    ], {
+      env: {
+        ...process.env,
+        HOME: homeDir,
+        CUBIC_API_KEY: "cbk_test_key",
+      },
+    })
+
+    const events = stdout
+      .trim()
+      .split("\n")
+      .filter((line) => line)
+      .map((line) => JSON.parse(line))
+
+    const skipped = events.filter((event) => event.type === "target_skipped")
+    const skippedAgents = skipped.map((event) => event.agent).sort()
+    assert.deepEqual(
+      skippedAgents,
+      ["claude", "cursor", "droid", "gemini", "opencode", "pi", "universal"],
+    )
+
+    const results = events.filter((event) => event.type === "target_result")
+    assert.equal(results.length, 1)
+    assert.equal(results[0].agent, "codex")
+    assert.equal(results[0].status, "ok")
+    assert.equal(results[0].mcpServers, 1)
+  })
+
+  it("detects opencode via the XDG config directory", async () => {
+    const homeDir = path.join(TMP_BASE, "auto-detect-opencode")
+    await mkdir(path.join(homeDir, ".config", "opencode"), { recursive: true })
+
+    const { stdout } = await exec("node", [
+      CLI,
+      "install",
+      "--json",
+      "--skills-only",
+      "--to",
+      "all",
+    ], {
+      env: {
+        ...process.env,
+        HOME: homeDir,
+      },
+    })
+
+    const events = stdout
+      .trim()
+      .split("\n")
+      .filter((line) => line)
+      .map((line) => JSON.parse(line))
+
+    const results = events.filter((event) => event.type === "target_result")
+    assert.equal(results.length, 1)
+    assert.equal(results[0].agent, "opencode")
+    assert.equal(results[0].status, "ok")
+  })
+
+  it("treats universal as opt-in (not auto-detected) even if home dir exists", async () => {
+    const homeDir = path.join(TMP_BASE, "auto-detect-no-universal")
+    await mkdir(homeDir, { recursive: true })
+
+    const { stdout } = await exec("node", [
+      CLI,
+      "install",
+      "--json",
+      "--skills-only",
+      "--to",
+      "all",
+    ], {
+      env: {
+        ...process.env,
+        HOME: homeDir,
+      },
+    })
+
+    const events = stdout
+      .trim()
+      .split("\n")
+      .filter((line) => line)
+      .map((line) => JSON.parse(line))
+
+    const skipped = events.filter((event) => event.type === "target_skipped")
+    assert.ok(skipped.some((event) => event.agent === "universal"))
+
+    const results = events.filter((event) => event.type === "target_result")
+    assert.equal(results.find((r) => r.agent === "universal"), undefined)
+  })
+})

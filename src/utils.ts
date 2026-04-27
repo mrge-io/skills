@@ -399,6 +399,33 @@ export interface TargetLayout {
   commandFilename: (source: string) => string
 }
 
+// Home-relative paths whose presence indicates the agent is installed.
+// `universal` is intentionally absent: it's an opt-in fallback, not a detected agent.
+export const AGENT_MARKERS: Record<string, string[]> = {
+  claude: [".claude", ".claude.json"],
+  cursor: [".cursor"],
+  codex: [".codex"],
+  droid: [".factory"],
+  gemini: [".gemini"],
+  opencode: [
+    path.join(".config", "opencode"),
+    path.join(".local", "share", "opencode"),
+  ],
+  pi: [".pi"],
+}
+
+export async function isAgentDetected(
+  name: string,
+  homeDir: string = os.homedir(),
+): Promise<boolean> {
+  const markers = AGENT_MARKERS[name]
+  if (!markers) return false
+  for (const marker of markers) {
+    if (await pathExists(path.join(homeDir, marker))) return true
+  }
+  return false
+}
+
 export const TARGET_LAYOUTS: Record<string, TargetLayout> = {
   claude: {
     skillsDir: (root) => path.join(root, ".claude", "skills"),
