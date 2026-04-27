@@ -12,6 +12,7 @@ import {
   AGENT_MARKERS,
   TARGET_LAYOUTS,
   readPluginVersion,
+  readLocalPluginVersion,
   readManifest,
   writeManifest,
   type InstallMethod,
@@ -617,6 +618,36 @@ export default defineCommand({
       }
     }
 
+    if (autoDetect && selectedTargets.length === 0) {
+      for (const name of skippedTargets) {
+        emit({ type: "target_skipped", agent: name, reason: "not_detected" })
+      }
+      const pluginVersion = await readLocalPluginVersion()
+      emit({
+        type: "install_summary",
+        pluginVersion,
+        targetsTotal: 0,
+        targetsSucceeded: 0,
+        targetsFailed: 0,
+        skillsTotal: 0,
+        commandsTotal: 0,
+        promptsTotal: 0,
+        mcpServersTotal: 0,
+      })
+      if (!jsonMode) {
+        const agents = Object.keys(AGENT_MARKERS).join(", ")
+        console.log(
+          "No supported AI coding tools detected in your home directory.",
+        )
+        console.log(`  Install one of: ${agents}.`)
+        console.log(
+          "  Or run with --to <target> to install anyway, or --to universal for the generic layout.",
+        )
+      }
+      emit({ type: "install_completed", ok: true })
+      return
+    }
+
     // install_started is emitted after resolvePluginRoot so we have pluginVersion
 
     let pluginRoot: string
@@ -670,10 +701,7 @@ export default defineCommand({
 
     for (const name of skippedTargets) {
       emit({ type: "target_skipped", agent: name, reason: "not_detected" })
-      if (!jsonMode) console.log(`  ${name}: skipped (agent not detected)`)
     }
-
-    const noneDetected = autoDetect && selectedTargets.length === 0
 
     const results: ResultEntry[] = []
 
@@ -910,16 +938,7 @@ export default defineCommand({
         console.log(`    - ${entry.agent}: ${entry.reason ?? "Unknown error"}`)
       }
     } else {
-      if (noneDetected) {
-        const agents = Object.keys(AGENT_MARKERS).join(", ")
-        console.log(
-          "\nNo supported AI coding tools detected in your home directory.",
-        )
-        console.log(`  Install one of: ${agents}.`)
-        console.log(
-          "  Or run with --to <target> to install anyway, or --to universal for the generic layout.",
-        )
-      } else if (skipped.length === results.length && results.length > 0) {
+      if (skipped.length === results.length && results.length > 0) {
         console.log("\n✓ Already installed. Nothing changed.")
       } else if (skillsOnly) {
         console.log(

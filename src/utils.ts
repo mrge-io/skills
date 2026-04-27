@@ -574,6 +574,10 @@ export async function readPluginVersion(pluginRoot: string): Promise<string> {
   }
 }
 
+export async function readLocalPluginVersion(): Promise<string> {
+  return readPluginVersion(path.resolve(__dirname, ".."))
+}
+
 export async function writeManifest(
   outputRoot: string,
   manifest: CubicManifest,
