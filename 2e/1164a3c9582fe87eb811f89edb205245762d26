@@ -1,0 +1,25 @@
+src/utils.ts
+  ebae19babeaa310f 577-580
+src/install.ts
+  ebae19babeaa310f 15,621-650,941
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.4",
+  "base_commit_sha": "2e1164a3c9582fe87eb811f89edb205245762d26",
+  "prompts": {
+    "ebae19babeaa310f": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d7412d13-4308-4ac9-9c2d-cd7f516f1f0c",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "sanxroz",
+      "messages": [],
+      "total_additions": 50,
+      "total_deletions": 27,
+      "accepted_lines": 41,
+      "overriden_lines": 0
+    }
+  }
+}
