@@ -22,6 +22,7 @@ import { targets, TARGET_NAMES } from "./targets/index.js"
 import { createEmitter } from "./events.js"
 
 const CUBIC_MCP_URL = "https://www.cubic.dev/api/mcp"
+const CUBIC_MCP_TOML_URL_PATTERN = /(^|\n)\s*url\s*=\s*["']https:\/\/www\.cubic\.dev\/api\/mcp\/?["']\s*(?=\n|$)/
 
 interface ResultEntry {
   agent: string
@@ -180,6 +181,10 @@ function readTomlInlineTableBody(
   return match ? match[2] : null
 }
 
+function normalizeMcpEndpoint(endpoint: string): string {
+  return endpoint.replace(/\/+$/, "")
+}
+
 async function jsonSectionHasMcpConfig(
   configPath: string,
   section: string,
@@ -201,7 +206,7 @@ async function jsonSectionHasMcpConfig(
     && !Array.isArray(headers)
   const auth = entry.auth
   return typeof endpoint === "string"
-    && endpoint === CUBIC_MCP_URL
+    && normalizeMcpEndpoint(endpoint) === CUBIC_MCP_URL
     && !hasHeaders
     && (options.requireAuth
       ? auth === options.requireAuth
@@ -215,7 +220,7 @@ async function fileHasTomlMcpConfig(
   const sectionBody = await readActiveTomlSectionBody(filePath, section)
   if (!sectionBody) return false
   const httpHeaders = readTomlInlineTableBody(sectionBody, "http_headers")
-  return /(^|\n)\s*url\s*=\s*"https:\/\/www\.cubic\.dev\/api\/mcp"\s*(?=\n|$)/.test(sectionBody)
+  return CUBIC_MCP_TOML_URL_PATTERN.test(sectionBody)
     && httpHeaders === null
     && !/(^|\n)\s*Authorization\s*=/.test(sectionBody)
 }

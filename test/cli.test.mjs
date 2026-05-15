@@ -859,6 +859,47 @@ describe("install skip behavior", () => {
     assert.equal(result.mcpServers, 1)
   })
 
+  it("recognizes JSON MCP endpoints with a trailing slash as already installed", async () => {
+    const outDir = path.join(TMP_BASE, "skip-json-trailing-slash-mcp")
+
+    await exec("node", [
+      CLI,
+      "install",
+      "--json",
+      "--to",
+      "cursor",
+      "-o",
+      outDir,
+    ])
+
+    const configPath = path.join(outDir, "cursor", "mcp.json")
+    const config = JSON.parse(await readFile(configPath, "utf-8"))
+    config.mcpServers.cubic.url = "https://www.cubic.dev/api/mcp/"
+    await writeFile(configPath, JSON.stringify(config, null, 2) + "\n")
+
+    const { stdout } = await exec("node", [
+      CLI,
+      "install",
+      "--json",
+      "--to",
+      "cursor",
+      "-o",
+      outDir,
+    ])
+
+    const events = stdout
+      .trim()
+      .split("\n")
+      .filter((line) => line)
+      .map((line) => JSON.parse(line))
+
+    const result = events.find((event) => event.type === "target_result")
+    assert.ok(result)
+    assert.equal(result.status, "ok")
+    assert.equal(result.reason, "already installed")
+    assert.equal(result.mcpServers, 0)
+  })
+
   it("recognizes Pi OAuth MCP installs as already installed", async () => {
     const outDir = path.join(TMP_BASE, "skip-pi-installed")
 
@@ -1245,6 +1286,58 @@ describe("install skip behavior", () => {
       existingConfig,
       /# http_headers = \{ Authorization = "Bearer cbk_test_key" \}/,
     )
+  })
+
+  it("recognizes Codex single-quoted MCP URLs with a trailing slash as already installed", async () => {
+    const outDir = path.join(TMP_BASE, "skip-codex-single-quoted-trailing-slash")
+
+    await exec(
+      "node",
+      [
+        CLI,
+        "install",
+        "--json",
+        "--to",
+        "codex",
+        "-o",
+        outDir,
+      ]
+    )
+
+    const configPath = path.join(outDir, "codex", "config.toml")
+    await writeFile(
+      configPath,
+      [
+        "[mcp_servers.cubic]",
+        "url = 'https://www.cubic.dev/api/mcp/'",
+        "",
+      ].join("\n"),
+    )
+
+    const { stdout } = await exec(
+      "node",
+      [
+        CLI,
+        "install",
+        "--json",
+        "--to",
+        "codex",
+        "-o",
+        outDir,
+      ]
+    )
+
+    const events = stdout
+      .trim()
+      .split("\n")
+      .filter((line) => line)
+      .map((line) => JSON.parse(line))
+
+    const result = events.find((event) => event.type === "target_result")
+    assert.ok(result)
+    assert.equal(result.status, "ok")
+    assert.equal(result.reason, "already installed")
+    assert.equal(result.mcpServers, 0)
   })
 
   it("migrates stray top-level Codex Authorization keys to OAuth config", async () => {
