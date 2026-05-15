@@ -3,7 +3,6 @@ import path from "path"
 import { promises as fs } from "fs"
 import {
   pathExists,
-  inlineApiKey,
   resolvePluginRoot,
   resolveInstallPluginRoot,
   installSkills,
@@ -20,8 +19,9 @@ import {
   type CubicManifest,
 } from "./utils.js"
 import { targets, TARGET_NAMES } from "./targets/index.js"
-import { promptForApiKey } from "./key-setup.js"
 import { createEmitter } from "./events.js"
+
+const CUBIC_MCP_URL = "https://www.cubic.dev/api/mcp"
 
 interface ResultEntry {
   agent: string
@@ -184,24 +184,28 @@ async function jsonSectionHasMcpConfig(
   configPath: string,
   section: string,
   key: string,
+  options: { requireAuth?: "oauth" } = {},
 ): Promise<boolean> {
   const entry = await readJsonSectionEntry(configPath, section, key)
   if (!entry) return false
   const endpoint = typeof entry.url === "string"
     ? entry.url
+    : typeof entry.httpUrl === "string"
+    ? entry.httpUrl
     : typeof entry.baseUrl === "string"
     ? entry.baseUrl
     : undefined
   const headers = entry.headers
-  const authHeader = typeof headers === "object"
+  const hasHeaders = typeof headers === "object"
     && headers !== null
     && !Array.isArray(headers)
-    ? (headers as Record<string, unknown>).Authorization
-    : undefined
+  const auth = entry.auth
   return typeof endpoint === "string"
-    && endpoint.length > 0
-    && typeof authHeader === "string"
-    && authHeader.length > 0
+    && endpoint === CUBIC_MCP_URL
+    && !hasHeaders
+    && (options.requireAuth
+      ? auth === options.requireAuth
+      : auth === undefined || auth === "oauth")
 }
 
 async function fileHasTomlMcpConfig(
@@ -211,12 +215,12 @@ async function fileHasTomlMcpConfig(
   const sectionBody = await readActiveTomlSectionBody(filePath, section)
   if (!sectionBody) return false
   const httpHeaders = readTomlInlineTableBody(sectionBody, "http_headers")
-  return /(^|\n)\s*url\s*=/.test(sectionBody)
-    && httpHeaders !== null
-    && /\bAuthorization\b\s*=/.test(httpHeaders)
+  return /(^|\n)\s*url\s*=\s*"https:\/\/www\.cubic\.dev\/api\/mcp"\s*(?=\n|$)/.test(sectionBody)
+    && httpHeaders === null
+    && !/(^|\n)\s*Authorization\s*=/.test(sectionBody)
 }
 
-function targetNeedsApiKey(name: string): boolean {
+function targetInstallsMcpConfig(name: string): boolean {
   return name !== "universal"
 }
 
@@ -252,103 +256,15 @@ async function targetHasMcpConfig(
       )
     case "pi":
       return jsonSectionHasMcpConfig(
-        path.join(outputRoot, "cubic", "mcporter.json"),
+        path.join(outputRoot, ".config", "mcp", "mcp.json"),
         "mcpServers",
         "cubic",
+        { requireAuth: "oauth" },
       )
     case "codex":
       return fileHasTomlMcpConfig(
         path.join(outputRoot, "config.toml"),
         "mcp_servers.cubic",
-      )
-    default:
-      return false
-  }
-}
-
-function expectedAuthHeader(apiKey: string): string {
-  return `Bearer ${apiKey}`
-}
-
-async function jsonSectionHasAuthHeader(
-  configPath: string,
-  section: string,
-  key: string,
-  authHeader: string,
-): Promise<boolean> {
-  const entry = await readJsonSectionEntry(configPath, section, key)
-  if (!entry) return false
-  const headers = entry.headers
-  if (typeof headers !== "object" || headers === null || Array.isArray(headers)) {
-    return false
-  }
-  return (headers as Record<string, unknown>).Authorization === authHeader
-}
-
-async function fileHasTomlSectionAuthHeader(
-  filePath: string,
-  section: string,
-  authHeader: string,
-): Promise<boolean> {
-  const sectionBody = await readActiveTomlSectionBody(filePath, section)
-  if (!sectionBody) return false
-  const httpHeaders = readTomlInlineTableBody(sectionBody, "http_headers")
-  if (!httpHeaders) return false
-  const escapedHeader = escapeRegExp(authHeader)
-  const authPattern = new RegExp(
-    `\\bAuthorization\\b\\s*=\\s*(?:"${escapedHeader}"|'${escapedHeader}')`,
-  )
-  return authPattern.test(httpHeaders)
-}
-
-async function targetHasApiKey(
-  name: string,
-  outputRoot: string,
-  apiKey: string,
-): Promise<boolean> {
-  const authHeader = expectedAuthHeader(apiKey)
-  switch (name) {
-    case "claude":
-      return jsonSectionHasAuthHeader(
-        path.join(outputRoot, ".mcp.json"),
-        "mcpServers",
-        "cubic",
-        authHeader,
-      )
-    case "cursor":
-    case "droid":
-      return jsonSectionHasAuthHeader(
-        path.join(outputRoot, "mcp.json"),
-        "mcpServers",
-        "cubic",
-        authHeader,
-      )
-    case "gemini":
-      return jsonSectionHasAuthHeader(
-        path.join(outputRoot, "settings.json"),
-        "mcpServers",
-        "cubic",
-        authHeader,
-      )
-    case "opencode":
-      return jsonSectionHasAuthHeader(
-        path.join(outputRoot, "opencode.json"),
-        "mcp",
-        "cubic",
-        authHeader,
-      )
-    case "pi":
-      return jsonSectionHasAuthHeader(
-        path.join(outputRoot, "cubic", "mcporter.json"),
-        "mcpServers",
-        "cubic",
-        authHeader,
-      )
-    case "codex":
-      return fileHasTomlSectionAuthHeader(
-        path.join(outputRoot, "config.toml"),
-        "mcp_servers.cubic",
-        authHeader,
       )
     default:
       return false
@@ -418,7 +334,6 @@ async function isTargetAlreadyInstalled(
   pluginRoot: string,
   pluginVersion: string,
   method: InstallMethod,
-  apiKeyHint?: string,
 ): Promise<boolean> {
   const layout = TARGET_LAYOUTS[name]
   if (!layout) return false
@@ -440,9 +355,6 @@ async function isTargetAlreadyInstalled(
   for (const entry of expectedEntries) {
     if (entry.type === "mcp-config") {
       if (!(await targetHasMcpConfig(name, outputRoot))) return false
-      if (apiKeyHint && !(await targetHasApiKey(name, outputRoot, apiKeyHint))) {
-        return false
-      }
       continue
     }
 
@@ -501,7 +413,7 @@ async function buildManifestEntries(
   }
 
   // MCP config (only for full installs)
-  if (!skillsOnly && targetNeedsApiKey(targetName)) {
+  if (!skillsOnly && targetInstallsMcpConfig(targetName)) {
     entries.push({
       name: "cubic",
       type: "mcp-config",
@@ -533,7 +445,7 @@ export default defineCommand({
       type: "boolean",
       default: false,
       description:
-        "Install only skills and commands (no MCP server or API key)",
+        "Install only skills and commands (no MCP server)",
     },
     json: {
       type: "boolean",
@@ -563,10 +475,6 @@ export default defineCommand({
     const skillsOnly = Boolean(args["skills-only"])
     const method = String(args.method) as InstallMethod
     const force = Boolean(args.force)
-    const envApiKey = process.env.CUBIC_API_KEY?.startsWith("cbk_")
-      ? process.env.CUBIC_API_KEY
-      : undefined
-
     if (method !== "paste" && method !== "symlink") {
       const msg = `Unknown method: ${method}. Available: paste, symlink`
       if (jsonMode) {
@@ -684,9 +592,6 @@ export default defineCommand({
       target: targetName,
     })
 
-    const mcpPath = path.join(pluginRoot, ".mcp.json")
-    let originalMcp: string | undefined
-
     if (!jsonMode) {
       console.log(
         skillsOnly
@@ -715,56 +620,12 @@ export default defineCommand({
             pluginRoot,
             pluginVersion,
             method,
-            envApiKey,
           )
         return { name, outputRoot, alreadyInstalled }
       }),
     )
 
-    let apiKey: string | undefined
-    const needsAuth = !skillsOnly
-      && installPlans.some((plan) => !plan.alreadyInstalled && targetNeedsApiKey(plan.name))
-    if (needsAuth) {
-      try {
-        apiKey = await promptForApiKey(emit, jsonMode)
-      } catch (err) {
-        if (jsonMode) {
-          const message = err instanceof Error ? err.message : String(err)
-          emit({
-            type: "install_failed",
-            code: "AUTH_FAILED",
-            message,
-            retryable: true,
-          })
-          process.exitCode = 1
-          return
-        }
-        throw err
-      }
-      if (jsonMode && !apiKey) {
-        emit({
-          type: "install_failed",
-          code: "AUTH_REQUIRED",
-          message:
-            "JSON mode requires CUBIC_API_KEY in the environment. Passing the key over stdin is not supported.",
-          retryable: true,
-        })
-        process.exitCode = 1
-        return
-      }
-    }
-
     try {
-      if (!skillsOnly && apiKey && (await pathExists(mcpPath))) {
-        originalMcp = await fs.readFile(mcpPath, "utf-8")
-        const mcpConfig = JSON.parse(originalMcp) as Record<string, unknown>
-        inlineApiKey(mcpConfig, apiKey)
-        await fs.writeFile(
-          mcpPath,
-          JSON.stringify(mcpConfig, null, 2) + "\n",
-        )
-      }
-
       for (const plan of installPlans) {
         const { name, outputRoot, alreadyInstalled } = plan
         const target = targets[name]
@@ -827,7 +688,7 @@ export default defineCommand({
               method,
             )
             await cleanupObsoleteManagedEntries(name, outputRoot, expectedEntries)
-            const tr = await target.install(pluginRoot, outputRoot, apiKey, method)
+            const tr = await target.install(pluginRoot, outputRoot, method)
             entry = {
               agent: name,
               ...tr,
@@ -873,9 +734,6 @@ export default defineCommand({
         }
       }
     } finally {
-      if (originalMcp) {
-        await fs.writeFile(mcpPath, originalMcp)
-      }
       if (cloned) {
         await fs.rm(sourcePluginRoot, { recursive: true, force: true })
       }
@@ -932,17 +790,8 @@ export default defineCommand({
         console.log(
           "\n✓ Done! Restart your editor to start using cubic skills.",
         )
-      } else if (!needsAuth || apiKey) {
-        console.log("\n✓ Done! Restart your editor to start using cubic.")
       } else {
-        console.log("\nNext steps:")
-        console.log(
-          "  1. Set your API key: export CUBIC_API_KEY=cbk_your_key_here",
-        )
-        console.log(
-          "     Get one at: https://www.cubic.dev/settings?tab=integrations&integration=mcp",
-        )
-        console.log("  2. Restart your editor")
+        console.log("\n✓ Done! Restart your editor to start using cubic.")
       }
     }
   },

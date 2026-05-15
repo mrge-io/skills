@@ -11,34 +11,6 @@ export interface InstallStartedEvent {
   pluginVersion: string
 }
 
-export interface AuthRequiredEvent {
-  type: "auth_required"
-  method: "api_key"
-  source: "env" | "prompt"
-  hasEnvKey: boolean
-}
-
-export interface AuthOpenUrlEvent {
-  type: "auth_open_url"
-  url: string
-}
-
-export interface AuthPromptEvent {
-  type: "auth_prompt"
-  field: "api_key"
-  masked: true
-}
-
-export interface AuthSuccessEvent {
-  type: "auth_success"
-  source: "env" | "prompt"
-}
-
-export interface AuthWarningEvent {
-  type: "auth_warning"
-  message: string
-}
-
 export interface TargetStartedEvent {
   type: "target_started"
   agent: string
@@ -88,11 +60,6 @@ export interface InstallFailedEvent {
 
 export type InstallEvent =
   | InstallStartedEvent
-  | AuthRequiredEvent
-  | AuthOpenUrlEvent
-  | AuthPromptEvent
-  | AuthSuccessEvent
-  | AuthWarningEvent
   | TargetStartedEvent
   | TargetSkippedEvent
   | TargetResultEvent

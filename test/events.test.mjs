@@ -124,48 +124,6 @@ describe("event types", () => {
     assert.equal(e.mode, "skills-only")
   })
 
-  it("auth_required", () => {
-    emit({
-      type: "auth_required",
-      method: "api_key",
-      source: "env",
-      hasEnvKey: true,
-    })
-    const e = JSON.parse(chunks[0])
-    assert.equal(e.type, "auth_required")
-    assert.equal(e.method, "api_key")
-    assert.equal(e.hasEnvKey, true)
-  })
-
-  it("auth_open_url", () => {
-    emit({ type: "auth_open_url", url: "https://example.com" })
-    const e = JSON.parse(chunks[0])
-    assert.equal(e.type, "auth_open_url")
-    assert.equal(e.url, "https://example.com")
-  })
-
-  it("auth_prompt", () => {
-    emit({ type: "auth_prompt", field: "api_key", masked: true })
-    const e = JSON.parse(chunks[0])
-    assert.equal(e.type, "auth_prompt")
-    assert.equal(e.field, "api_key")
-    assert.equal(e.masked, true)
-  })
-
-  it("auth_success", () => {
-    emit({ type: "auth_success", source: "prompt" })
-    const e = JSON.parse(chunks[0])
-    assert.equal(e.type, "auth_success")
-    assert.equal(e.source, "prompt")
-  })
-
-  it("auth_warning", () => {
-    emit({ type: "auth_warning", message: "Key doesn't start with 'cbk_'." })
-    const e = JSON.parse(chunks[0])
-    assert.equal(e.type, "auth_warning")
-    assert.equal(e.message, "Key doesn't start with 'cbk_'.")
-  })
-
   it("target_started", () => {
     emit({ type: "target_started", agent: "opencode" })
     const e = JSON.parse(chunks[0])
@@ -243,14 +201,14 @@ describe("event types", () => {
   it("install_failed", () => {
     emit({
       type: "install_failed",
-      code: "AUTH_INVALID_KEY",
-      message: "Invalid API key",
+      code: "UNKNOWN_TARGET",
+      message: "Unknown target",
       retryable: true,
     })
     const e = JSON.parse(chunks[0])
     assert.equal(e.type, "install_failed")
-    assert.equal(e.code, "AUTH_INVALID_KEY")
-    assert.equal(e.message, "Invalid API key")
+    assert.equal(e.code, "UNKNOWN_TARGET")
+    assert.equal(e.message, "Unknown target")
     assert.equal(e.retryable, true)
   })
 })

@@ -2,7 +2,6 @@ import path from "path"
 import os from "os"
 import { promises as fs } from "fs"
 import type { Target, TargetResult } from "./index.js"
-import { authHeader } from "./index.js"
 import type { InstallMethod } from "../utils.js"
 import {
   parseFrontmatter,
@@ -21,7 +20,7 @@ const CUBIC_PROMPTS = [
 ]
 
 export const codex: Target = {
-  async install(pluginRoot: string, outputRoot: string, apiKey?: string, method: InstallMethod = "paste"): Promise<TargetResult> {
+  async install(pluginRoot: string, outputRoot: string, method: InstallMethod = "paste"): Promise<TargetResult> {
     const skillCount = await installSkills(pluginRoot, path.join(outputRoot, "skills"), method)
 
     const cmdSource = path.join(pluginRoot, "commands")
@@ -47,7 +46,6 @@ export const codex: Target = {
     const toml = [
       "[mcp_servers.cubic]",
       'url = "https://www.cubic.dev/api/mcp"',
-      `http_headers = { Authorization = "${authHeader(apiKey)}" }`,
       "",
     ].join("\n")
     await fs.mkdir(outputRoot, { recursive: true })

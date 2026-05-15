@@ -24,7 +24,7 @@ const CUBIC_COMMANDS = [
 ]
 
 export const opencode: Target = {
-  async install(pluginRoot: string, outputRoot: string, _apiKey?: string, method: InstallMethod = "paste"): Promise<TargetResult> {
+  async install(pluginRoot: string, outputRoot: string, method: InstallMethod = "paste"): Promise<TargetResult> {
     const skillCount = await installSkills(pluginRoot, path.join(outputRoot, "skills"), method)
 
     const cmdSource = path.join(pluginRoot, "commands")

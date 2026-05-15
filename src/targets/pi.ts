@@ -2,7 +2,6 @@ import path from "path"
 import os from "os"
 import { promises as fs } from "fs"
 import type { Target, TargetResult } from "./index.js"
-import { authHeader } from "./index.js"
 import type { InstallMethod } from "../utils.js"
 import {
   parseFrontmatter,
@@ -10,6 +9,8 @@ import {
   pathExists,
   installSkills,
   uninstallSkills,
+  mergeJsonConfig,
+  removeMcpFromJsonConfig,
 } from "../utils.js"
 
 const CUBIC_PROMPTS = [
@@ -21,13 +22,14 @@ const CUBIC_PROMPTS = [
 ]
 
 export const pi: Target = {
-  async install(pluginRoot: string, outputRoot: string, apiKey?: string, method: InstallMethod = "paste"): Promise<TargetResult> {
-    const skillCount = await installSkills(pluginRoot, path.join(outputRoot, "skills"), method)
+  async install(pluginRoot: string, outputRoot: string, method: InstallMethod = "paste"): Promise<TargetResult> {
+    const agentDir = path.join(outputRoot, ".pi", "agent")
+    const skillCount = await installSkills(pluginRoot, path.join(agentDir, "skills"), method)
 
     const cmdSource = path.join(pluginRoot, "commands")
     let cmdCount = 0
     if (await pathExists(cmdSource)) {
-      const promptsDir = path.join(outputRoot, "prompts")
+      const promptsDir = path.join(agentDir, "prompts")
       await fs.mkdir(promptsDir, { recursive: true })
       for (const file of await fs.readdir(cmdSource)) {
         if (!file.endsWith(".md")) continue
@@ -43,40 +45,31 @@ export const pi: Target = {
       }
     }
 
-    const mcporterDir = path.join(outputRoot, "cubic")
-    await fs.mkdir(mcporterDir, { recursive: true })
-    await fs.writeFile(
-      path.join(mcporterDir, "mcporter.json"),
-      JSON.stringify(
-        {
-          mcpServers: {
-            cubic: {
-              baseUrl: "https://www.cubic.dev/api/mcp",
-              headers: { Authorization: authHeader(apiKey) },
-            },
-          },
-        },
-        null,
-        2,
-      ) + "\n",
-    )
+    await mergeJsonConfig(path.join(outputRoot, ".config", "mcp", "mcp.json"), {
+      cubic: {
+        auth: "oauth",
+        url: "https://www.cubic.dev/api/mcp",
+      },
+    })
 
 
     return { skills: skillCount, commands: 0, prompts: cmdCount, mcpServers: 1 }
   },
 
   async uninstall(outputRoot: string): Promise<void> {
-    await uninstallSkills(path.join(outputRoot, "skills"))
+    const agentDir = path.join(outputRoot, ".pi", "agent")
+    await uninstallSkills(path.join(agentDir, "skills"))
     for (const p of CUBIC_PROMPTS) {
-      const fp = path.join(outputRoot, "prompts", p)
+      const fp = path.join(agentDir, "prompts", p)
       if (await pathExists(fp)) await fs.unlink(fp)
     }
-    const mcporterDir = path.join(outputRoot, "cubic")
+    await removeMcpFromJsonConfig(path.join(outputRoot, ".config", "mcp", "mcp.json"), "cubic")
+    const mcporterDir = path.join(agentDir, "cubic")
     if (await pathExists(mcporterDir)) await fs.rm(mcporterDir, { recursive: true })
     console.log("  pi: removed")
   },
 
   defaultRoot(): string {
-    return path.join(os.homedir(), ".pi", "agent")
+    return os.homedir()
   },
 }
