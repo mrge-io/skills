@@ -63,11 +63,10 @@ jobs:
       - name: Setup npm auth
         run: echo "//registry.npmjs.org/:_authToken=${{ secrets.NPM_TOKEN }}" > ~/.npmrc
 
+      - name: Push version changes
+        run: git push --atomic --follow-tags origin HEAD:${GITHUB_REF_NAME}
+
       - name: Publish
         run: npm publish --access public
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-
-      - name: Push version changes
-        if: success()
-        run: git push --follow-tags
