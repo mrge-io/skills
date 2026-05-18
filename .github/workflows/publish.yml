@@ -25,6 +25,7 @@ permissions:
 
 jobs:
   publish:
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -48,13 +49,16 @@ jobs:
       - name: Bump version
         run: |
           if [ -n "${VERSION}" ]; then
-            npm version "${VERSION}" --no-git-tag-version
+            npm version "${VERSION}"
           else
-            npm version "${BUMP}" --no-git-tag-version
+            npm version "${BUMP}"
           fi
         env:
           BUMP: ${{ inputs.bump }}
           VERSION: ${{ inputs.version }}
+
+      - name: Run tests
+        run: npm test
 
       - name: Setup npm auth
         run: echo "//registry.npmjs.org/:_authToken=${{ secrets.NPM_TOKEN }}" > ~/.npmrc
@@ -63,3 +67,7 @@ jobs:
         run: npm publish --access public
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Push version changes
+        if: success()
+        run: git push --follow-tags
