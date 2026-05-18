@@ -20,7 +20,7 @@ const CUBIC_COMMANDS = [
 ]
 
 export const universal: Target = {
-  async install(pluginRoot: string, outputRoot: string, _apiKey?: string, method: InstallMethod = "paste"): Promise<TargetResult> {
+  async install(pluginRoot: string, outputRoot: string, method: InstallMethod = "paste"): Promise<TargetResult> {
     const agentsDir = path.join(outputRoot, ".agents")
     const skillCount = await installSkills(pluginRoot, path.join(agentsDir, "skills"), method)
 

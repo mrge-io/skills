@@ -166,41 +166,46 @@ describe("install --json error paths", () => {
     }
   })
 
-  it("explains that json auth must come from the environment", async () => {
-    const outDir = path.join(TMP_BASE, "json-auth-required")
+  it("installs OAuth MCP config in json mode without an API key", async () => {
+    const outDir = path.join(TMP_BASE, "json-oauth-config")
     const env = { ...process.env }
     delete env.CUBIC_API_KEY
 
-    try {
-      await exec("node", [
-        CLI,
-        "install",
-        "--json",
-        "--to",
-        "claude",
-        "-o",
-        outDir,
-      ], { env })
-      assert.fail("should have exited with non-zero code")
-    } catch (err) {
-      assert.ok(err.code !== 0, "exit code should be non-zero")
-      const events = (err.stdout || "")
-        .trim()
-        .split("\n")
-        .filter((l) => l)
-        .map((l) => JSON.parse(l))
+    const { stdout } = await exec("node", [
+      CLI,
+      "install",
+      "--json",
+      "--to",
+      "claude",
+      "-o",
+      outDir,
+    ], { env })
 
-      const warning = events.find((e) => e.type === "auth_warning")
-      assert.ok(warning)
-      assert.match(warning.message, /CUBIC_API_KEY/)
-      assert.match(warning.message, /stdin is not supported/i)
+    const events = stdout
+      .trim()
+      .split("\n")
+      .filter((l) => l)
+      .map((l) => JSON.parse(l))
 
-      const failed = events.find((e) => e.type === "install_failed")
-      assert.ok(failed)
-      assert.equal(failed.code, "AUTH_REQUIRED")
-      assert.match(failed.message, /CUBIC_API_KEY/)
-      assert.match(failed.message, /stdin is not supported/i)
-    }
+    assert.equal(
+      events.some((e) => e.type === "install_failed"),
+      false,
+      "should not fail when CUBIC_API_KEY is absent",
+    )
+
+    const result = events.find((e) => e.type === "target_result")
+    assert.ok(result)
+    assert.equal(result.agent, "claude")
+    assert.equal(result.status, "ok")
+    assert.equal(result.mcpServers, 1)
+
+    const config = JSON.parse(
+      await readFile(path.join(outDir, "claude", ".mcp.json"), "utf-8"),
+    )
+    assert.deepEqual(config.mcpServers.cubic, {
+      type: "http",
+      url: "https://www.cubic.dev/api/mcp",
+    })
   })
 
   it("reports invalid existing JSON config with the failing path", async () => {
@@ -219,12 +224,7 @@ describe("install --json error paths", () => {
         "cursor",
         "-o",
         outDir,
-      ], {
-        env: {
-          ...process.env,
-          CUBIC_API_KEY: "cbk_test_key",
-        },
-      })
+      ])
       assert.fail("should have exited with non-zero code")
     } catch (err) {
       assert.ok(err.code !== 0, "exit code should be non-zero")
@@ -264,12 +264,7 @@ describe("install --json error paths", () => {
       "all",
       "-o",
       outDir,
-    ], {
-      env: {
-        ...process.env,
-        CUBIC_API_KEY: "cbk_test_key",
-      },
-    })
+    ])
 
     const events = stdout
       .trim()
@@ -374,12 +369,7 @@ describe("install text mode (backward compatibility)", () => {
         "cursor",
         "-o",
         outDir,
-      ], {
-        env: {
-          ...process.env,
-          CUBIC_API_KEY: "cbk_test_key",
-        },
-      })
+      ])
       assert.fail("should have exited with non-zero code")
     } catch (err) {
       assert.ok(err.code !== 0, "exit code should be non-zero")
@@ -507,6 +497,7 @@ describe("target default roots", () => {
     assert.equal(targets.claude.defaultRoot(), os.homedir())
     assert.equal(targets.cursor.defaultRoot(), path.join(os.homedir(), ".cursor"))
     assert.equal(targets.gemini.defaultRoot(), path.join(os.homedir(), ".gemini"))
+    assert.equal(targets.pi.defaultRoot(), os.homedir())
     assert.equal(targets.universal.defaultRoot(), os.homedir())
   })
 })
@@ -514,26 +505,125 @@ describe("target default roots", () => {
 describe("install skip behavior", () => {
   after(cleanup)
 
-  it("skips reinstalling an already installed target before auth", async () => {
+  it("skips reinstalling an already installed target", async () => {
     const outDir = path.join(TMP_BASE, "skip-installed")
 
-    await exec(
-      "node",
-      [
-        CLI,
-        "install",
-        "--json",
-        "--to",
-        "claude",
-        "-o",
-        outDir,
-      ],
-      {
-        env: {
-          ...process.env,
-          CUBIC_API_KEY: "cbk_test_key",
-        },
-      },
+    await exec("node", [
+      CLI,
+      "install",
+      "--json",
+      "--to",
+      "claude",
+      "-o",
+      outDir,
+    ])
+
+    const { stdout } = await exec("node", [
+      CLI,
+      "install",
+      "--json",
+      "--to",
+      "claude",
+      "-o",
+      outDir,
+    ])
+
+    const events = stdout
+      .trim()
+      .split("\n")
+      .filter((line) => line)
+      .map((line) => JSON.parse(line))
+
+    assert.equal(
+      events.some((event) => event.type === "auth_required"),
+      false,
+      "should not emit legacy auth events when target is already installed",
+    )
+
+    const result = events.find((event) => event.type === "target_result")
+    assert.ok(result)
+    assert.equal(result.status, "ok")
+    assert.equal(result.reason, "already installed")
+    assert.equal(result.skills, 0)
+    assert.equal(result.commands, 0)
+    assert.equal(result.mcpServers, 0)
+
+    const completed = events.find((event) => event.type === "install_completed")
+    assert.ok(completed)
+    assert.equal(completed.ok, true)
+  })
+
+  it("migrates legacy API-key MCP config to OAuth on rerun", async () => {
+    const outDir = path.join(TMP_BASE, "skip-legacy-key")
+
+    await exec("node", [
+      CLI,
+      "install",
+      "--json",
+      "--to",
+      "claude",
+      "-o",
+      outDir,
+    ])
+
+    const configPath = path.join(outDir, "claude", ".mcp.json")
+    const legacyConfig = JSON.parse(await readFile(configPath, "utf-8"))
+    legacyConfig.mcpServers.cubic.headers = {
+      Authorization: "Bearer cbk_old_key",
+    }
+    await writeFile(configPath, JSON.stringify(legacyConfig, null, 2) + "\n")
+
+    const { stdout } = await exec("node", [
+      CLI,
+      "install",
+      "--json",
+      "--to",
+      "claude",
+      "-o",
+      outDir,
+    ])
+
+    const events = stdout
+      .trim()
+      .split("\n")
+      .filter((line) => line)
+      .map((line) => JSON.parse(line))
+
+    assert.equal(
+      events.some((event) => event.type === "auth_required"),
+      false,
+      "should not emit legacy auth events while migrating",
+    )
+
+    const result = events.find((event) => event.type === "target_result")
+    assert.ok(result)
+    assert.equal(result.status, "ok")
+    assert.equal(result.reason, null)
+    assert.equal(result.mcpServers, 1)
+
+    const installedConfig = JSON.parse(await readFile(configPath, "utf-8"))
+    assert.deepEqual(installedConfig.mcpServers.cubic, {
+      type: "http",
+      url: "https://www.cubic.dev/api/mcp",
+    })
+  })
+
+  it("does not skip partially broken installs", async () => {
+    const outDir = path.join(TMP_BASE, "skip-partial-install")
+
+    await exec("node", [
+      CLI,
+      "install",
+      "--json",
+      "--to",
+      "claude",
+      "-o",
+      outDir,
+    ])
+
+    await rm(
+      path.join(outDir, "claude", ".claude", "skills", "cubic-loop", "SKILL.md"),
+      { force: true },
     )
 
     const { stdout } = await exec("node", [
@@ -555,151 +645,18 @@ describe("install skip behavior", () => {
     assert.equal(
       events.some((event) => event.type === "auth_required"),
       false,
-      "should not prompt for auth when target is already installed",
+      "should not emit legacy auth events when required files are missing",
     )
-
-    const result = events.find((event) => event.type === "target_result")
-    assert.ok(result)
-    assert.equal(result.status, "ok")
-    assert.equal(result.reason, "already installed")
-    assert.equal(result.skills, 0)
-    assert.equal(result.commands, 0)
-    assert.equal(result.mcpServers, 0)
-
-    const completed = events.find((event) => event.type === "install_completed")
-    assert.ok(completed)
-    assert.equal(completed.ok, true)
-  })
-
-  it("reinstalls when the provided API key differs from the installed one", async () => {
-    const outDir = path.join(TMP_BASE, "skip-rotated-key")
-
-    await exec(
-      "node",
-      [
-        CLI,
-        "install",
-        "--json",
-        "--to",
-        "claude",
-        "-o",
-        outDir,
-      ],
-      {
-        env: {
-          ...process.env,
-          CUBIC_API_KEY: "cbk_old_key",
-        },
-      },
-    )
-
-    const { stdout } = await exec(
-      "node",
-      [
-        CLI,
-        "install",
-        "--json",
-        "--to",
-        "claude",
-        "-o",
-        outDir,
-      ],
-      {
-        env: {
-          ...process.env,
-          CUBIC_API_KEY: "cbk_new_key",
-        },
-      },
-    )
-
-    const events = stdout
-      .trim()
-      .split("\n")
-      .filter((line) => line)
-      .map((line) => JSON.parse(line))
-
     assert.equal(
-      events.some((event) => event.type === "auth_required"),
-      true,
-      "should request auth when the provided key differs",
+      events.some((event) => event.type === "target_result" && event.reason === "already installed"),
+      false,
+      "should not report the target as already installed",
     )
 
     const result = events.find((event) => event.type === "target_result")
     assert.ok(result)
     assert.equal(result.status, "ok")
     assert.equal(result.reason, null)
-    assert.equal(result.mcpServers, 1)
-
-    const installedConfig = await readFile(
-      path.join(outDir, "claude", ".mcp.json"),
-      "utf-8",
-    )
-    assert.ok(installedConfig.includes("cbk_new_key"))
-    assert.equal(installedConfig.includes("cbk_old_key"), false)
-  })
-
-  it("does not skip partially broken installs", async () => {
-    const outDir = path.join(TMP_BASE, "skip-partial-install")
-
-    await exec(
-      "node",
-      [
-        CLI,
-        "install",
-        "--json",
-        "--to",
-        "claude",
-        "-o",
-        outDir,
-      ],
-      {
-        env: {
-          ...process.env,
-          CUBIC_API_KEY: "cbk_test_key",
-        },
-      },
-    )
-
-    await rm(
-      path.join(outDir, "claude", ".claude", "skills", "cubic-loop", "SKILL.md"),
-      { force: true },
-    )
-
-    try {
-      await exec("node", [
-        CLI,
-        "install",
-        "--json",
-        "--to",
-        "claude",
-        "-o",
-        outDir,
-      ])
-      assert.fail("should require auth because the install is incomplete")
-    } catch (err) {
-      assert.ok(err.code !== 0, "exit code should be non-zero")
-
-      const events = (err.stdout || "")
-        .trim()
-        .split("\n")
-        .filter((line) => line)
-        .map((line) => JSON.parse(line))
-
-      assert.equal(
-        events.some((event) => event.type === "auth_required"),
-        true,
-        "should prompt for auth when required files are missing",
-      )
-      assert.equal(
-        events.some((event) => event.type === "target_result" && event.reason === "already installed"),
-        false,
-        "should not report the target as already installed",
-      )
-
-      const failed = events.find((event) => event.type === "install_failed")
-      assert.ok(failed)
-      assert.equal(failed.code, "AUTH_REQUIRED")
-    }
   })
 
   it("skips repeated full installs for targets that do not need auth", async () => {
@@ -756,13 +713,7 @@ describe("install skip behavior", () => {
         "claude",
         "-o",
         outDir,
-      ],
-      {
-        env: {
-          ...process.env,
-          CUBIC_API_KEY: "cbk_test_key",
-        },
-      },
+      ]
     )
 
     const manifestPath = path.join(outDir, "claude", ".cubic-manifest.claude.json")
@@ -797,13 +748,7 @@ describe("install skip behavior", () => {
         "claude",
         "-o",
         outDir,
-      ],
-      {
-        env: {
-          ...process.env,
-          CUBIC_API_KEY: "cbk_test_key",
-        },
-      },
+      ]
     )
 
     const events = stdout
@@ -833,13 +778,7 @@ describe("install skip behavior", () => {
         "cursor",
         "-o",
         outDir,
-      ],
-      {
-        env: {
-          ...process.env,
-          CUBIC_API_KEY: "cbk_test_key",
-        },
-      },
+      ]
     )
 
     const configPath = path.join(outDir, "cursor", "mcp.json")
@@ -857,13 +796,7 @@ describe("install skip behavior", () => {
         "cursor",
         "-o",
         outDir,
-      ],
-      {
-        env: {
-          ...process.env,
-          CUBIC_API_KEY: "cbk_test_key",
-        },
-      },
+      ]
     )
 
     const events = stdout
@@ -892,13 +825,7 @@ describe("install skip behavior", () => {
         "cursor",
         "-o",
         outDir,
-      ],
-      {
-        env: {
-          ...process.env,
-          CUBIC_API_KEY: "cbk_test_key",
-        },
-      },
+      ]
     )
 
     const configPath = path.join(outDir, "cursor", "mcp.json")
@@ -916,13 +843,7 @@ describe("install skip behavior", () => {
         "cursor",
         "-o",
         outDir,
-      ],
-      {
-        env: {
-          ...process.env,
-          CUBIC_API_KEY: "cbk_test_key",
-        },
-      },
+      ]
     )
 
     const events = stdout
@@ -938,7 +859,48 @@ describe("install skip behavior", () => {
     assert.equal(result.mcpServers, 1)
   })
 
-  it("recognizes Pi installs as already installed from mcporter baseUrl config", async () => {
+  it("recognizes JSON MCP endpoints with a trailing slash as already installed", async () => {
+    const outDir = path.join(TMP_BASE, "skip-json-trailing-slash-mcp")
+
+    await exec("node", [
+      CLI,
+      "install",
+      "--json",
+      "--to",
+      "cursor",
+      "-o",
+      outDir,
+    ])
+
+    const configPath = path.join(outDir, "cursor", "mcp.json")
+    const config = JSON.parse(await readFile(configPath, "utf-8"))
+    config.mcpServers.cubic.url = "https://www.cubic.dev/api/mcp/"
+    await writeFile(configPath, JSON.stringify(config, null, 2) + "\n")
+
+    const { stdout } = await exec("node", [
+      CLI,
+      "install",
+      "--json",
+      "--to",
+      "cursor",
+      "-o",
+      outDir,
+    ])
+
+    const events = stdout
+      .trim()
+      .split("\n")
+      .filter((line) => line)
+      .map((line) => JSON.parse(line))
+
+    const result = events.find((event) => event.type === "target_result")
+    assert.ok(result)
+    assert.equal(result.status, "ok")
+    assert.equal(result.reason, "already installed")
+    assert.equal(result.mcpServers, 0)
+  })
+
+  it("recognizes Pi OAuth MCP installs as already installed", async () => {
     const outDir = path.join(TMP_BASE, "skip-pi-installed")
 
     await exec(
@@ -951,13 +913,7 @@ describe("install skip behavior", () => {
         "pi",
         "-o",
         outDir,
-      ],
-      {
-        env: {
-          ...process.env,
-          CUBIC_API_KEY: "cbk_test_key",
-        },
-      },
+      ]
     )
 
     const { stdout } = await exec("node", [
@@ -986,6 +942,14 @@ describe("install skip behavior", () => {
     assert.ok(result)
     assert.equal(result.status, "ok")
     assert.equal(result.reason, "already installed")
+
+    const config = JSON.parse(
+      await readFile(path.join(outDir, "pi", ".config", "mcp", "mcp.json"), "utf-8"),
+    )
+    assert.deepEqual(config.mcpServers.cubic, {
+      auth: "oauth",
+      url: "https://www.cubic.dev/api/mcp",
+    })
   })
 
   it("keeps per-target manifests separate when Claude and Universal share a home directory", async () => {
@@ -1004,7 +968,6 @@ describe("install skip behavior", () => {
         env: {
           ...process.env,
           HOME: homeDir,
-          CUBIC_API_KEY: "cbk_test_key",
         },
       },
     )
@@ -1131,13 +1094,7 @@ describe("install skip behavior", () => {
         "claude",
         "-o",
         outDir,
-      ],
-      {
-        env: {
-          ...process.env,
-          CUBIC_API_KEY: "cbk_test_key",
-        },
-      },
+      ]
     )
 
     const manifestPath = path.join(outDir, "claude", ".cubic-manifest.claude.json")
@@ -1165,13 +1122,7 @@ describe("install skip behavior", () => {
         "claude",
         "-o",
         outDir,
-      ],
-      {
-        env: {
-          ...process.env,
-          CUBIC_API_KEY: "cbk_test_key",
-        },
-      },
+      ]
     )
 
     const events = stdout
@@ -1201,13 +1152,7 @@ describe("install skip behavior", () => {
         "codex",
         "-o",
         outDir,
-      ],
-      {
-        env: {
-          ...process.env,
-          CUBIC_API_KEY: "cbk_test_key",
-        },
-      },
+      ]
     )
 
     const configPath = path.join(outDir, "codex", "config.toml")
@@ -1223,13 +1168,7 @@ describe("install skip behavior", () => {
         "codex",
         "-o",
         outDir,
-      ],
-      {
-        env: {
-          ...process.env,
-          CUBIC_API_KEY: "cbk_test_key",
-        },
-      },
+      ]
     )
 
     const events = stdout
@@ -1258,13 +1197,7 @@ describe("install skip behavior", () => {
         "codex",
         "-o",
         outDir,
-      ],
-      {
-        env: {
-          ...process.env,
-          CUBIC_API_KEY: "cbk_test_key",
-        },
-      },
+      ]
     )
 
     const configPath = path.join(outDir, "codex", "config.toml")
@@ -1280,13 +1213,7 @@ describe("install skip behavior", () => {
         "codex",
         "-o",
         outDir,
-      ],
-      {
-        env: {
-          ...process.env,
-          CUBIC_API_KEY: "cbk_test_key",
-        },
-      },
+      ]
     )
 
     const events = stdout
@@ -1302,7 +1229,7 @@ describe("install skip behavior", () => {
     assert.ok(result.prompts > 0)
   })
 
-  it("does not treat commented Codex auth headers as installed config", async () => {
+  it("recognizes Codex config with commented legacy auth headers as already installed", async () => {
     const outDir = path.join(TMP_BASE, "skip-codex-commented-auth")
 
     await exec(
@@ -1315,13 +1242,7 @@ describe("install skip behavior", () => {
         "codex",
         "-o",
         outDir,
-      ],
-      {
-        env: {
-          ...process.env,
-          CUBIC_API_KEY: "cbk_test_key",
-        },
-      },
+      ]
     )
 
     const configPath = path.join(outDir, "codex", "config.toml")
@@ -1345,13 +1266,7 @@ describe("install skip behavior", () => {
         "codex",
         "-o",
         outDir,
-      ],
-      {
-        env: {
-          ...process.env,
-          CUBIC_API_KEY: "cbk_test_key",
-        },
-      },
+      ]
     )
 
     const events = stdout
@@ -1363,17 +1278,69 @@ describe("install skip behavior", () => {
     const result = events.find((event) => event.type === "target_result")
     assert.ok(result)
     assert.equal(result.status, "ok")
-    assert.equal(result.reason, null)
-    assert.equal(result.mcpServers, 1)
+    assert.equal(result.reason, "already installed")
+    assert.equal(result.mcpServers, 0)
 
-    const rewrittenConfig = await readFile(configPath, "utf-8")
+    const existingConfig = await readFile(configPath, "utf-8")
     assert.match(
-      rewrittenConfig,
-      /http_headers = \{ Authorization = "Bearer cbk_test_key" \}/,
+      existingConfig,
+      /# http_headers = \{ Authorization = "Bearer cbk_test_key" \}/,
     )
   })
 
-  it("does not treat stray top-level Codex Authorization keys as installed config", async () => {
+  it("recognizes Codex single-quoted MCP URLs with a trailing slash as already installed", async () => {
+    const outDir = path.join(TMP_BASE, "skip-codex-single-quoted-trailing-slash")
+
+    await exec(
+      "node",
+      [
+        CLI,
+        "install",
+        "--json",
+        "--to",
+        "codex",
+        "-o",
+        outDir,
+      ]
+    )
+
+    const configPath = path.join(outDir, "codex", "config.toml")
+    await writeFile(
+      configPath,
+      [
+        "[mcp_servers.cubic]",
+        "url = 'https://www.cubic.dev/api/mcp/'",
+        "",
+      ].join("\n"),
+    )
+
+    const { stdout } = await exec(
+      "node",
+      [
+        CLI,
+        "install",
+        "--json",
+        "--to",
+        "codex",
+        "-o",
+        outDir,
+      ]
+    )
+
+    const events = stdout
+      .trim()
+      .split("\n")
+      .filter((line) => line)
+      .map((line) => JSON.parse(line))
+
+    const result = events.find((event) => event.type === "target_result")
+    assert.ok(result)
+    assert.equal(result.status, "ok")
+    assert.equal(result.reason, "already installed")
+    assert.equal(result.mcpServers, 0)
+  })
+
+  it("migrates stray top-level Codex Authorization keys to OAuth config", async () => {
     const outDir = path.join(TMP_BASE, "skip-codex-stray-auth")
 
     await exec(
@@ -1386,13 +1353,7 @@ describe("install skip behavior", () => {
         "codex",
         "-o",
         outDir,
-      ],
-      {
-        env: {
-          ...process.env,
-          CUBIC_API_KEY: "cbk_test_key",
-        },
-      },
+      ]
     )
 
     const configPath = path.join(outDir, "codex", "config.toml")
@@ -1416,13 +1377,7 @@ describe("install skip behavior", () => {
         "codex",
         "-o",
         outDir,
-      ],
-      {
-        env: {
-          ...process.env,
-          CUBIC_API_KEY: "cbk_test_key",
-        },
-      },
+      ]
     )
 
     const events = stdout
@@ -1438,10 +1393,10 @@ describe("install skip behavior", () => {
     assert.equal(result.mcpServers, 1)
 
     const rewrittenConfig = await readFile(configPath, "utf-8")
-    assert.match(
-      rewrittenConfig,
-      /http_headers = \{ Authorization = "Bearer cbk_test_key" \}/,
-    )
+    assert.match(rewrittenConfig, /\[mcp_servers\.cubic\]/)
+    assert.match(rewrittenConfig, /url = "https:\/\/www\.cubic\.dev\/api\/mcp"/)
+    assert.doesNotMatch(rewrittenConfig, /Authorization/)
+    assert.doesNotMatch(rewrittenConfig, /http_headers/)
   })
 
   it("recognizes Codex installs as already installed when the MCP section is valid", async () => {
@@ -1457,13 +1412,7 @@ describe("install skip behavior", () => {
         "codex",
         "-o",
         outDir,
-      ],
-      {
-        env: {
-          ...process.env,
-          CUBIC_API_KEY: "cbk_test_key",
-        },
-      },
+      ]
     )
 
     const { stdout } = await exec("node", [
@@ -1662,7 +1611,6 @@ describe("install agent auto-detection", () => {
       env: {
         ...process.env,
         HOME: homeDir,
-        CUBIC_API_KEY: "cbk_test_key",
       },
     })
 

@@ -1,4 +1,4 @@
-# cubic Plugin for Claude Code
+# cubic Plugin for AI Coding Tools
 
 Access cubic's AI code review insights directly from Claude Code. Get PR review issues, browse AI-generated wikis, check codebase scans, and apply team review learnings — all without leaving your editor.
 
@@ -45,7 +45,8 @@ npx @cubic-plugin/cubic-plugin install --to universal
 By default, installs go to the user's home directory under `~` using each tool's standard config location.
 If a target is already installed, the installer skips it; use `--force` to reinstall.
 
-The installer will prompt you for your API key during setup only when a target still needs MCP configuration.
+The installer writes OAuth-ready MCP configuration. It does not ask for a cubic API key.
+After installing, use your coding tool's MCP login flow to authenticate cubic.
 
 To uninstall, use the same `--to` flag:
 
@@ -57,7 +58,6 @@ npx @cubic-plugin/cubic-plugin uninstall --to opencode
 
 - [Claude Code](https://code.claude.com) v1.0.33+
 - A [cubic](https://www.cubic.dev) account with an active installation
-- A cubic API key (`cbk_*`)
 - (Optional) [cubic CLI](https://cubic.dev/install) for `/cubic:run-review`
 
 ## Installation
@@ -98,21 +98,32 @@ When team members open the project in Claude Code and trust the repository, they
 
 ## Setup
 
-The installer will prompt you for your API key during `npx @cubic-plugin/cubic-plugin install`. It opens your browser to the [cubic dashboard](https://www.cubic.dev/settings?tab=integrations&integration=mcp) where you can generate a key, then you paste it in the terminal. The key is saved directly into the MCP configuration.
+The installer writes cubic's MCP server URL into each supported tool:
 
-You can also set `CUBIC_API_KEY` in your environment and the installer will detect it automatically.
+```text
+https://www.cubic.dev/api/mcp
+```
+
+Use OAuth to authenticate from the tool after install:
+
+- Claude Code: run `/mcp`, choose cubic, and complete the browser flow.
+- Cursor: open **Settings** → **Tools and MCP**, then click **Connect** for cubic.
+- Cursor Agent: run `cursor-agent mcp login cubic`.
+- Codex: run `codex mcp login cubic`.
+- Gemini CLI: run `/mcp auth cubic`.
+- OpenCode: run `opencode mcp auth cubic`.
+- Droid: open `/mcp`, choose cubic, and complete the browser flow.
+- Pi: run `/mcp-auth cubic`.
 
 ### Non-interactive JSON mode (for wrappers/installers)
 
-When using JSON mode (`--json`) from another CLI wrapper, installation is intentionally non-interactive. Set `CUBIC_API_KEY` first:
+When using JSON mode (`--json`) from another CLI wrapper, installation is non-interactive and emits NDJSON progress events:
 
 ```bash
-CUBIC_API_KEY="cbk_..." npx -y @cubic-plugin/cubic-plugin install --json --method symlink
+npx -y @cubic-plugin/cubic-plugin install --json --method symlink
 ```
 
-If `CUBIC_API_KEY` is missing, JSON mode returns a structured `install_failed` event with `code: "AUTH_REQUIRED"`.
-
-> **Tip:** In Claude Code, you can also just say "set up my cubic key" and paste your key — the installer will detect your OS and shell and save it automatically.
+No API key is required for JSON mode; users authenticate later through their MCP client.
 
 ## Commands
 

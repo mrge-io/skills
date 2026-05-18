@@ -9,24 +9,6 @@ export type InstallMethod = "paste" | "symlink"
 
 const STABLE_PLUGIN_DIR = path.join(".cubic-plugin", "plugin-source")
 
-export function inlineApiKey(
-  mcpConfig: Record<string, unknown>,
-  apiKey: string,
-): void {
-  for (const server of Object.values(mcpConfig)) {
-    if (typeof server !== "object" || server === null) continue
-    const headers = (server as Record<string, unknown>).headers as
-      | Record<string, string>
-      | undefined
-    if (!headers) continue
-    for (const [key, value] of Object.entries(headers)) {
-      if (typeof value === "string") {
-        headers[key] = value.replace(/\$\{CUBIC_API_KEY\}/g, apiKey)
-      }
-    }
-  }
-}
-
 export async function pathExists(p: string): Promise<boolean> {
   try {
     await fs.access(p)
@@ -374,7 +356,7 @@ async function cloneFromGitHub(silent?: boolean): Promise<string> {
   const tempDir = await fs.mkdtemp(
     path.join(os.tmpdir(), "cubic-plugin-install-"),
   )
-  const repo = "https://github.com/mrge-io/cubic-claude-plugin"
+  const repo = "https://github.com/mrge-io/skills"
   if (!silent) console.log("Fetching latest plugin from GitHub...")
   try {
     execFileSync("git", ["clone", "--depth", "1", repo, tempDir], {
@@ -458,8 +440,8 @@ export const TARGET_LAYOUTS: Record<string, TargetLayout> = {
     commandFilename: (s) => `cubic-${s}`,
   },
   pi: {
-    skillsDir: (root) => path.join(root, "skills"),
-    commandDir: (root) => path.join(root, "prompts"),
+    skillsDir: (root) => path.join(root, ".pi", "agent", "skills"),
+    commandDir: (root) => path.join(root, ".pi", "agent", "prompts"),
     commandFormat: "stripped",
     commandFilename: (s) => `cubic-${s}`,
   },

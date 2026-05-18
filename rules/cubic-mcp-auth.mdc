@@ -1,0 +1,11 @@
+---
+description: Ensure cubic MCP OAuth is connected before using cubic tools
+alwaysApply: true
+---
+
+cubic-mcp-auth:
+
+- The cubic MCP server uses OAuth at `https://www.cubic.dev/api/mcp`.
+- New MCP configs should not include `Authorization` headers or `CUBIC_API_KEY`.
+- If cubic MCP tools return authentication errors, ask the user to reconnect or log in through their MCP client.
+- Existing `cbk_*` API keys may appear in legacy configs during migration. Never log, display, or commit them.

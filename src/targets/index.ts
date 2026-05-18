@@ -16,13 +16,9 @@ export interface TargetResult {
 }
 
 export interface Target {
-  install(pluginRoot: string, outputRoot: string, apiKey?: string, method?: InstallMethod): Promise<TargetResult>
+  install(pluginRoot: string, outputRoot: string, method?: InstallMethod): Promise<TargetResult>
   uninstall(outputRoot: string): Promise<void>
   defaultRoot(): string
-}
-
-export function authHeader(apiKey?: string): string {
-  return apiKey ? `Bearer ${apiKey}` : "Bearer ${CUBIC_API_KEY}"
 }
 
 export const targets: Record<string, Target> = {

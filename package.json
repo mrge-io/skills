@@ -1,7 +1,7 @@
 {
   "name": "@cubic-plugin/cubic-plugin",
-  "version": "1.3.5",
-  "description": "Install cubic AI code review plugin for OpenCode",
+  "version": "1.3.6",
+  "description": "Install cubic AI code review skills and MCP configuration for AI coding tools",
   "type": "module",
   "bin": {
     "cubic-plugin": "./dist/index.js"
