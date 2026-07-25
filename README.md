@@ -132,7 +132,7 @@ No API key is required for JSON mode; users authenticate later through their MCP
 | `/cubic:comments [pr-number]`    | Show cubic's review comments on the current PR (auto-detects branch)   |
 | `/cubic:run-review [flags]`      | Run a local cubic AI code review on uncommitted changes or branch diff |
 | `/cubic:wiki [page-name]`        | Browse AI-generated codebase documentation                             |
-| `/cubic:scan [scan-id]`          | View codebase security scan results and issues                    |
+| `/cubic:scan [issue-id]`         | View repository scan results or one issue's full details               |
 | `/cubic:learnings [learning-id]` | Show team code review patterns and preferences                         |
 
 ## Skills (Auto-triggered)
@@ -144,6 +144,7 @@ These activate automatically based on what you're doing:
 | **check-pr-comments**    | "Check all PR comments", PR comments/issues, fixing review feedback | Fetches unresolved cubic PR comments, fixes worthwhile issues, commits/pushes, and resolves handled threads |
 | **run-review**         | "Review my code", pre-commit/PR quality checks | Runs a local cubic AI code review via CLI and surfaces issues      |
 | **cubic-loop**         | "Loop until clean", polishing before merge     | Iteratively reviews, fixes, and re-reviews until clean             |
+| **handle-codebase-scan** | Codebase scan requests, CSV exports, or issue UUIDs | Retrieves full findings through MCP, verifies them, and fixes requested issues |
 | **codebase-context**   | Asking about architecture or how things work   | Queries the cubic AI Wiki for architectural context                |
 | **review-patterns**    | Writing or reviewing code                      | Pulls team learnings to apply coding conventions                   |
 
@@ -176,6 +177,8 @@ skills/
 │   ├── run-review/        # Runs local AI code review via cubic CLI
 │   │   └── SKILL.md
 │   ├── cubic-loop/        # Iteratively reviews, fixes, and re-reviews until clean
+│   │   └── SKILL.md
+│   ├── handle-codebase-scan/ # Investigates and fixes codebase scan findings
 │   │   └── SKILL.md
 │   ├── codebase-context/  # Auto-queries wiki for architecture context
 │   │   └── SKILL.md

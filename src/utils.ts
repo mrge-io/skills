@@ -189,6 +189,7 @@ export const CUBIC_SKILLS = [
   "check-pr-comments",
   "run-review",
   "cubic-loop",
+  "handle-codebase-scan",
 ]
 
 const LEGACY_CUBIC_SKILLS = [
