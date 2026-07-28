@@ -25,16 +25,21 @@ make only the changes the user requests.
 
 ### 2. Retrieve findings
 
-- In repository mode, call `get_scan` with `owner`, `repo`, relevant user-requested filters, and an
-  `offset`. Follow `hasMore`, advancing by the returned `limit`, until the requested result set is
-  complete. The response contains aggregated findings, not findings for a supplied scan ID.
-- Map requests for open findings to `triageStatus: "open"`. Order selected findings from highest to
-  lowest severity.
+- In repository mode, call `get_scan` with `owner`, `repo`, `triageStatus: "open"`, `limit: 10`,
+  and `offset: 0` by default. The response aggregates the latest completed full scan with newer
+  completed diff scans; it does not accept a scan ID.
+- Apply `category`, `minSeverity`, `filePath`, or a different `triageStatus` only when the user asks
+  for it. For "unresolved" findings, retrieve both `open` and `in_review`. Retrieve all statuses
+  only when the user explicitly asks for them.
+- Do not follow `hasMore` by default. Show the first page and its total count, then fetch another
+  page only when the user asks for more or explicitly requested a larger result set.
 - For listing requests, present the `get_scan` summaries without fetching every full report. Fetch
   an issue with the cubic codebase scan `get_issue` tool only when the user asks to investigate or
   fix it.
-- In CSV or issue-ID mode, call `get_issue` directly for each selected UUID. Process one issue at a
-  time instead of loading every full report into context.
+- For an investigation or fix request without a user-selected issue list, process at most the five
+  highest-severity findings in one batch and report how many remain.
+- In CSV or issue-ID mode, call `get_issue` directly for each selected UUID. Process no more than
+  five issues per batch and load one full report at a time.
 - If a required cubic codebase scan MCP tool is unavailable, stop and ask the user to connect and
   authenticate the cubic MCP integration. Do not retry the same unavailable tool for every issue.
 
