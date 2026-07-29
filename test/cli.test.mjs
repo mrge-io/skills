@@ -52,7 +52,7 @@ describe("install --json --skills-only", () => {
     assert.ok(result)
     assert.equal(result.agent, "claude")
     assert.equal(result.status, "ok")
-    assert.equal(result.skills, 5)
+    assert.equal(result.skills, 6)
     assert.equal(result.commands, 5)
     assert.equal(result.mcpServers, 0)
 
@@ -93,10 +93,13 @@ describe("install --json --skills-only", () => {
 
     const results = events.filter((e) => e.type === "target_result")
     assert.equal(results.length, 8, "one result per target")
+    for (const result of results) {
+      assert.equal(result.skills, 6, `${result.agent} installs all six skills`)
+    }
 
     const summary = events.find((e) => e.type === "install_summary")
     assert.equal(summary.targetsTotal, 8)
-    assert.equal(summary.skillsTotal, 40)
+    assert.equal(summary.skillsTotal, 48)
     assert.equal(summary.commandsTotal, 40)
   })
 
@@ -314,7 +317,7 @@ describe("install text mode (backward compatibility)", () => {
 
     assert.ok(stdout.includes("Installing cubic skills"), "has progress text")
     assert.ok(
-      stdout.includes("claude: 5 skills, 5 commands"),
+      stdout.includes("claude: 6 skills, 5 commands"),
       "has target summary",
     )
     assert.ok(stdout.includes("Done!"), "has completion message")
@@ -382,7 +385,7 @@ describe("install text mode (backward compatibility)", () => {
 describe("uninstallSkills", () => {
   after(cleanup)
 
-  it("removes cubic-loop along with the existing cubic skills", async () => {
+  it("removes all current and legacy cubic skills", async () => {
     const skillsDir = path.join(TMP_BASE, "uninstall-skills", "skills")
     const skillNames = [
       "review-patterns",
@@ -391,6 +394,7 @@ describe("uninstallSkills", () => {
       "review-and-fix-issues",
       "run-review",
       "cubic-loop",
+      "handle-codebase-scan",
     ]
 
     for (const skill of skillNames) {
@@ -430,10 +434,48 @@ describe("installSkills", () => {
     )
 
     const count = await utils.installSkills(pluginRoot, skillsDir)
-    assert.ok(count >= 5)
+    assert.ok(count >= 6)
 
     await assert.rejects(access(legacyDir))
     await access(path.join(skillsDir, "check-pr-comments", "SKILL.md"))
+    await access(path.join(skillsDir, "handle-codebase-scan", "SKILL.md"))
+  })
+})
+
+describe("codebase scan handoff artifacts", () => {
+  it("declares the read-only MCP tools required by the scan skill", async () => {
+    const skill = await readFile(
+      path.join(__dirname, "..", "skills", "handle-codebase-scan", "SKILL.md"),
+      "utf8",
+    )
+
+    assert.match(skill, /^---\nname: handle-codebase-scan\n/)
+    assert.match(
+      skill,
+      /allowed-tools: \[Bash, cubic:list_scans, cubic:get_scan, cubic:get_issue\]/,
+    )
+    assert.match(skill, /triageStatus: "open"/)
+    assert.match(skill, /`limit: 10`/)
+    assert.match(skill, /at most the five/)
+    assert.match(skill, /Do not follow `hasMore` by default/)
+    assert.match(skill, /For listing requests, present the `get_scan` summaries/)
+    assert.match(skill, /still present, fixed, already/)
+    assert.doesNotMatch(skill, /cubic:update_issue_status/)
+  })
+
+  it("uses issue IDs and repository coordinates in the explicit scan command", async () => {
+    const command = await readFile(
+      path.join(__dirname, "..", "commands", "scan.md"),
+      "utf8",
+    )
+
+    assert.match(command, /argument-hint: \[issue-id\]/)
+    assert.match(command, /Call `get_issue` with the issue ID/)
+    assert.match(command, /Call `get_scan` with the owner and repo/)
+    assert.match(command, /`triageStatus: "open"`/)
+    assert.match(command, /`limit: 10`/)
+    assert.match(command, /follow `hasMore` only when the user asks for more/)
+    assert.doesNotMatch(command, /scanId/)
   })
 })
 
