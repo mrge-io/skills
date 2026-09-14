@@ -462,7 +462,7 @@ export default defineCommand({
     method: {
       type: "string",
       default: "paste",
-      description: 'Installation method: "paste" (copy files) or "symlink" (create symlinks; Codex always copies)',
+      description: 'Installation method: "paste" (copy files) or "symlink" (create symlinks)',
     },
     force: {
       type: "boolean",
