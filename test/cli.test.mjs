@@ -1742,54 +1742,57 @@ describe("install agent auto-detection", () => {
 describe("Codex skill file discovery", () => {
   after(cleanup)
 
-  for (const skillsOnly of [false, true]) {
-    for (const oldMethod of ["paste", "symlink"]) {
-      it(`copies Codex skills and repairs ${oldMethod} manifests (${skillsOnly ? "skills-only" : "full"})`, async () => {
-        const outDir = path.join(TMP_BASE, `codex-discovery-${skillsOnly}-${oldMethod}`)
-        const args = [CLI, "install", "--json", "--to", "codex", "--method", "symlink", "-o", outDir]
-        if (skillsOnly) args.push("--skills-only")
-        const run = async () => {
-          const { stdout } = await exec("node", args)
-          return stdout.trim().split("\n").map(JSON.parse)
-        }
-        const first = await run()
-        assert.equal(first.find(e => e.type === "target_result").method, "paste")
-        const root = path.join(outDir, "codex")
-        const manifestPath = path.join(root, ".cubic-manifest.codex.json")
-        const manifest = JSON.parse(await readFile(manifestPath, "utf-8"))
-        assert.equal(manifest.method, "paste")
-        const skills = manifest.entries.filter(e => e.type === "skill")
-        assert.equal(skills.length, 6)
-        for (const skill of skills) {
-          assert.equal(skill.method, "paste")
-          assert.ok((await lstat(path.join(root, skill.file))).isFile())
-        }
+  for (const target of ["codex", "universal"]) {
+    for (const skillsOnly of [false, true]) {
+      for (const oldMethod of ["paste", "symlink"]) {
+        it(`copies ${target} skills and repairs ${oldMethod} manifests (${skillsOnly ? "skills-only" : "full"})`, async () => {
+          const outDir = path.join(TMP_BASE, `${target}-discovery-${skillsOnly}-${oldMethod}`)
+          const args = [CLI, "install", "--json", "--to", target, "--method", "symlink", "-o", outDir]
+          if (skillsOnly) args.push("--skills-only")
+          const run = async () => {
+            const { stdout } = await exec("node", args)
+            return stdout.trim().split("\n").map(JSON.parse)
+          }
+          const first = await run()
+          assert.equal(first.find(e => e.type === "target_result").method, "paste")
+          const root = path.join(outDir, target)
+          const manifestPath = path.join(root, `.cubic-manifest.${target}.json`)
+          const manifest = JSON.parse(await readFile(manifestPath, "utf-8"))
+          assert.equal(manifest.method, "paste")
+          const skillRoot = target === "universal" ? path.join(root, ".agents") : root
+          const skills = manifest.entries.filter(e => e.type === "skill")
+          assert.equal(skills.length, 6)
+          for (const skill of skills) {
+            assert.equal(skill.method, "paste")
+            assert.ok((await lstat(path.join(skillRoot, skill.file))).isFile())
+          }
 
-        // Reproduce a legacy link, including a misleading copy-mode manifest.
-        const skillPath = path.join(root, skills[0].file)
-        const expected = await readFile(skillPath, "utf-8")
-        const oldSource = path.join(outDir, "old-source.md")
-        await writeFile(oldSource, "old source must stay unchanged")
-        await rm(skillPath)
-        await symlink(oldSource, skillPath)
-        manifest.method = oldMethod
-        for (const skill of skills) skill.method = oldMethod
-        await writeFile(manifestPath, JSON.stringify(manifest))
+          // Reproduce a legacy link, including a misleading copy-mode manifest.
+          const skillPath = path.join(skillRoot, skills[0].file)
+          const expected = await readFile(skillPath, "utf-8")
+          const oldSource = path.join(outDir, "old-source.md")
+          await writeFile(oldSource, "old source must stay unchanged")
+          await rm(skillPath)
+          await symlink(oldSource, skillPath)
+          manifest.method = oldMethod
+          for (const skill of skills) skill.method = oldMethod
+          await writeFile(manifestPath, JSON.stringify(manifest))
 
-        const repaired = await run()
-        const result = repaired.find(e => e.type === "target_result")
-        assert.equal(result.status, "ok")
-        assert.equal(result.reason, null)
-        assert.ok((await lstat(skillPath)).isFile())
-        assert.equal(await readFile(skillPath, "utf-8"), expected)
-        assert.equal(await readFile(oldSource, "utf-8"), "old source must stay unchanged")
-        const repeated = await run()
-        assert.equal(repeated.find(e => e.type === "target_result").reason, "already installed")
-      })
+          const repaired = await run()
+          const result = repaired.find(e => e.type === "target_result")
+          assert.equal(result.status, "ok")
+          assert.equal(result.reason, null)
+          assert.ok((await lstat(skillPath)).isFile())
+          assert.equal(await readFile(skillPath, "utf-8"), expected)
+          assert.equal(await readFile(oldSource, "utf-8"), "old source must stay unchanged")
+          const repeated = await run()
+          assert.equal(repeated.find(e => e.type === "target_result").reason, "already installed")
+        })
+      }
     }
   }
 
-  it("leaves the shared source untouched for Codex-only npx installs", async () => {
+  it("leaves the shared source untouched for copy-only npx installs", async () => {
     const root = path.join(TMP_BASE, "codex-npx-source")
     const home = path.join(root, "home")
     const packageRoot = path.join(home, ".npm", "_npx", "cache", "node_modules", "cubic-plugin")
@@ -1805,12 +1808,15 @@ describe("Codex skill file discovery", () => {
     await writeFile(sentinel, "other agents still use this source")
     const args = [path.join(packageRoot, "dist", "index.js"), "install", "--json", "--skills-only", "--method", "symlink", "-o", path.join(root, "output")]
     const options = { env: { ...process.env, HOME: home } }
-    const { stdout } = await exec("node", [...args, "--to", "codex"], options)
-    const result = stdout.trim().split("\n").map(JSON.parse).find(e => e.type === "target_result")
-    assert.equal(result.status, "ok")
-    assert.equal(result.method, "paste")
-    assert.equal(await readFile(sentinel, "utf-8"), "other agents still use this source")
-    assert.ok((await lstat(path.join(root, "output", "codex", "skills", "run-review", "SKILL.md"))).isFile())
+    for (const target of ["codex", "universal"]) {
+      const { stdout } = await exec("node", [...args, "--to", target], options)
+      const result = stdout.trim().split("\n").map(JSON.parse).find(e => e.type === "target_result")
+      assert.equal(result.status, "ok")
+      assert.equal(result.method, "paste")
+      assert.equal(await readFile(sentinel, "utf-8"), "other agents still use this source")
+      const skillRoot = path.join(root, "output", target, ...(target === "universal" ? [".agents"] : []))
+      assert.ok((await lstat(path.join(skillRoot, "skills", "run-review", "SKILL.md"))).isFile())
+    }
 
     // Mixed installs still materialize the source for targets that need links.
     await exec("node", [...args, "--to", "all"], options)

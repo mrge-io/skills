@@ -368,7 +368,7 @@ async function isTargetAlreadyInstalled(
       : path.join(layout.commandDir(outputRoot), entry.file)
 
     if (!(await pathExists(entryPath))) return false
-    if (name === "codex" && entry.type === "skill"
+    if (entry.method === "paste" && entry.type === "skill"
       && (await fs.lstat(entryPath)).isSymbolicLink()) return false
   }
 
@@ -561,8 +561,9 @@ export default defineCommand({
 
     const targetPlans = selectedTargets.map((name) => {
       const target = targets[name]
-      // Codex does not discover symlinked SKILL.md files.
-      const targetMethod: InstallMethod = name === "codex" ? "paste" : method
+      // Codex scans both its own and the universal skill directory,
+      // but does not discover symlinked SKILL.md files.
+      const targetMethod: InstallMethod = name === "codex" || name === "universal" ? "paste" : method
       const outputRoot = args.output
         ? path.resolve(String(args.output), name)
         : target.defaultRoot()
