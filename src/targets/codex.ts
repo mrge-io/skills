@@ -2,7 +2,6 @@ import path from "path"
 import os from "os"
 import { promises as fs } from "fs"
 import type { Target, TargetResult } from "./index.js"
-import type { InstallMethod } from "../utils.js"
 import {
   parseFrontmatter,
   formatFrontmatter,
@@ -20,8 +19,8 @@ const CUBIC_PROMPTS = [
 ]
 
 export const codex: Target = {
-  async install(pluginRoot: string, outputRoot: string, method: InstallMethod = "paste"): Promise<TargetResult> {
-    const skillCount = await installSkills(pluginRoot, path.join(outputRoot, "skills"), method)
+  async install(pluginRoot: string, outputRoot: string): Promise<TargetResult> {
+    const skillCount = await installSkills(pluginRoot, path.join(outputRoot, "skills"), "paste")
 
     const cmdSource = path.join(pluginRoot, "commands")
     let cmdCount = 0

@@ -368,6 +368,8 @@ async function isTargetAlreadyInstalled(
       : path.join(layout.commandDir(outputRoot), entry.file)
 
     if (!(await pathExists(entryPath))) return false
+    if (name === "codex" && entry.type === "skill"
+      && (await fs.lstat(entryPath)).isSymbolicLink()) return false
   }
 
   return true
@@ -460,7 +462,7 @@ export default defineCommand({
     method: {
       type: "string",
       default: "paste",
-      description: 'Installation method: "paste" (copy files) or "symlink" (create symlinks)',
+      description: 'Installation method: "paste" (copy files) or "symlink" (create symlinks; Codex always copies)',
     },
     force: {
       type: "boolean",
@@ -613,6 +615,8 @@ export default defineCommand({
 
     const installPlans = await Promise.all(
       selectedTargets.map(async (name) => {
+        // Codex does not discover symlinked SKILL.md files.
+        const targetMethod: InstallMethod = name === "codex" ? "paste" : method
         const target = targets[name]
         const outputRoot = args.output
           ? path.resolve(String(args.output), name)
@@ -624,15 +628,15 @@ export default defineCommand({
             skillsOnly,
             pluginRoot,
             pluginVersion,
-            method,
+            targetMethod,
           )
-        return { name, outputRoot, alreadyInstalled }
+        return { name, outputRoot, alreadyInstalled, method: targetMethod }
       }),
     )
 
     try {
       for (const plan of installPlans) {
-        const { name, outputRoot, alreadyInstalled } = plan
+        const { name, outputRoot, alreadyInstalled, method } = plan
         const target = targets[name]
         await fs.mkdir(outputRoot, { recursive: true })
 

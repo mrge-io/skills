@@ -5,7 +5,7 @@ import os from "node:os"
 import { promisify } from "node:util"
 import path from "node:path"
 import { fileURLToPath } from "node:url"
-import { access, mkdir, readFile, rm, writeFile } from "node:fs/promises"
+import { access, lstat, mkdir, readFile, rm, symlink, writeFile } from "node:fs/promises"
 import { pathToFileURL } from "node:url"
 
 const exec = promisify(execFile)
@@ -1735,5 +1735,63 @@ describe("install agent auto-detection", () => {
 
     const results = events.filter((event) => event.type === "target_result")
     assert.equal(results.find((r) => r.agent === "universal"), undefined)
+  })
+})
+
+
+describe("Codex skill file discovery", () => {
+  after(cleanup)
+
+  for (const skillsOnly of [false, true]) {
+    for (const oldMethod of ["paste", "symlink"]) {
+      it(`copies Codex skills and repairs ${oldMethod} manifests (${skillsOnly ? "skills-only" : "full"})`, async () => {
+        const outDir = path.join(TMP_BASE, `codex-discovery-${skillsOnly}-${oldMethod}`)
+        const args = [CLI, "install", "--json", "--to", "codex", "--method", "symlink", "-o", outDir]
+        if (skillsOnly) args.push("--skills-only")
+        const run = async () => {
+          const { stdout } = await exec("node", args)
+          return stdout.trim().split("\n").map(JSON.parse)
+        }
+        const first = await run()
+        assert.equal(first.find(e => e.type === "target_result").method, "paste")
+        const root = path.join(outDir, "codex")
+        const manifestPath = path.join(root, ".cubic-manifest.codex.json")
+        const manifest = JSON.parse(await readFile(manifestPath, "utf-8"))
+        assert.equal(manifest.method, "paste")
+        const skills = manifest.entries.filter(e => e.type === "skill")
+        assert.equal(skills.length, 6)
+        for (const skill of skills) {
+          assert.equal(skill.method, "paste")
+          assert.ok((await lstat(path.join(root, skill.file))).isFile())
+        }
+
+        // Reproduce a legacy link, including a misleading copy-mode manifest.
+        const skillPath = path.join(root, skills[0].file)
+        const expected = await readFile(skillPath, "utf-8")
+        const oldSource = path.join(outDir, "old-source.md")
+        await writeFile(oldSource, "old source must stay unchanged")
+        await rm(skillPath)
+        await symlink(oldSource, skillPath)
+        manifest.method = oldMethod
+        for (const skill of skills) skill.method = oldMethod
+        await writeFile(manifestPath, JSON.stringify(manifest))
+
+        const repaired = await run()
+        const result = repaired.find(e => e.type === "target_result")
+        assert.equal(result.status, "ok")
+        assert.equal(result.reason, null)
+        assert.ok((await lstat(skillPath)).isFile())
+        assert.equal(await readFile(skillPath, "utf-8"), expected)
+        assert.equal(await readFile(oldSource, "utf-8"), "old source must stay unchanged")
+        const repeated = await run()
+        assert.equal(repeated.find(e => e.type === "target_result").reason, "already installed")
+      })
+    }
+  }
+
+  it("preserves symlink installation for other agents", async () => {
+    const outDir = path.join(TMP_BASE, "claude-skill-symlink")
+    await exec("node", [CLI, "install", "--json", "--skills-only", "--to", "claude", "--method", "symlink", "-o", outDir])
+    assert.ok((await lstat(path.join(outDir, "claude", ".claude", "skills", "run-review", "SKILL.md"))).isSymbolicLink())
   })
 })
