@@ -1,0 +1,23 @@
+package.json
+  45e6946f8c451e70 3
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.4",
+  "base_commit_sha": "db71d2794f325df918713a0e166b3985b8006bbc",
+  "prompts": {
+    "45e6946f8c451e70": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "5d737bc6-2101-4e0f-81f9-07f7d845e9ff",
+        "model": "claude-4.6-opus-high-thinking"
+      },
+      "human_author": "sanxroz",
+      "messages": [],
+      "total_additions": 1,
+      "total_deletions": 1,
+      "accepted_lines": 1,
+      "overriden_lines": 0
+    }
+  }
+}

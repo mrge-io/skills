@@ -1,0 +1,62 @@
+src/targets/gemini.ts
+  s_16542d5ea1822f::t_34e561aee77440 35,58
+src/targets/codex.ts
+  s_16542d5ea1822f::t_34e561aee77440 23
+src/targets/droid.ts
+  s_16542d5ea1822f::t_34e561aee77440 25
+src/targets/universal.ts
+  s_16542d5ea1822f::t_34e561aee77440 23
+.mcp.json
+  s_16542d5ea1822f::t_6874f77c254cd2 4
+mcp.json
+  s_16542d5ea1822f::t_6874f77c254cd2 5
+src/index.ts
+  s_16542d5ea1822f::t_eca1e7686ec0e6 10
+test/cli.test.mjs
+  s_16542d5ea1822f::t_38cef97a85f48a 169-170,174-182,184-188,190-208
+  s_16542d5ea1822f::t_cc655d33c89bd6 508,511-519,540,556-557,559-567,569-584,594-595,604-608,614-622,629-637,639-643,645-654,656-659
+  s_16542d5ea1822f::t_6b1433be459920 227,267,372,716,751,781,799,828,846,875,1056,1084,1114,1130,1159,1175,1204,1228,1263,1287,1322
+  s_16542d5ea1822f::t_c66b4c8b45f3a4 1191,1240-1241,1243,1245-1246,1250,1303-1306
+  s_16542d5ea1822f::t_11c59f4a447af1 500,862,904-911
+src/targets/cursor.ts
+  s_16542d5ea1822f::t_34e561aee77440 25,49
+src/targets/opencode.ts
+  s_16542d5ea1822f::t_34e561aee77440 27
+rules/cubic-mcp-auth.mdc
+  s_16542d5ea1822f::t_1c49aa1814037c 1-11
+README.md
+  s_16542d5ea1822f::t_49b180cb9c9348 48-49,101,103-116,120,123,126
+  s_16542d5ea1822f::t_76dbfe85d2dad4 1
+src/utils.ts
+  s_16542d5ea1822f::t_c2af0a40301189 359,443-444
+src/targets/pi.ts
+  s_16542d5ea1822f::t_34e561aee77440 12-13,25-27,32,48-53,60-61,63,66-67,73
+package.json
+  s_16542d5ea1822f::t_e2a7fac50393a1 4
+test/events.test.mjs
+  s_16542d5ea1822f::t_345841f4e2dd5f 204-205,210-211
+src/targets/index.ts
+  s_16542d5ea1822f::t_34e561aee77440 19
+src/install.ts
+  s_16542d5ea1822f::t_139bb02b878e90 24-25,193-194,199,202,204-205,218-220,223,259,416,448,691,794
+  s_16542d5ea1822f::t_9b0b1fdd0da7d9 206-208
+  s_16542d5ea1822f::t_e5be7f35a136e9 187,262
+src/targets/claude.ts
+  s_16542d5ea1822f::t_34e561aee77440 18
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.8",
+  "base_commit_sha": "f7909336d082161f8e28b8db61353f36ce8b55dd",
+  "prompts": {},
+  "sessions": {
+    "s_16542d5ea1822f": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019e2643-28da-7060-87cf-0ff2f00e482a",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Gaurav Arora <whoarora@gmail.com>"
+    }
+  }
+}

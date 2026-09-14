@@ -1,0 +1,23 @@
+package.json
+  60ecb1f8e7941fb1 3
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.4",
+  "base_commit_sha": "381d22092fd60d4d118632a92043d37232ea5a6b",
+  "prompts": {
+    "60ecb1f8e7941fb1": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "5750eaf4-396c-413b-8774-bba101d251aa",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "sanxroz",
+      "messages": [],
+      "total_additions": 1,
+      "total_deletions": 1,
+      "accepted_lines": 1,
+      "overriden_lines": 0
+    }
+  }
+}

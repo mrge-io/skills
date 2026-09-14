@@ -1,0 +1,19 @@
+.github/workflows/publish.yml
+  s_a39337397ba037::t_4f1b3f45f815c9 1-65
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.8",
+  "base_commit_sha": "3946bddab7ba358d631a9c2d9e3341a9a0b3d2a5",
+  "prompts": {},
+  "sessions": {
+    "s_a39337397ba037": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019e3aff-9317-7b53-ab14-75510fc39f13",
+        "model": "gpt-5.3-codex-spark"
+      },
+      "human_author": "sanxroz <san7yx@gmail.com>"
+    }
+  }
+}

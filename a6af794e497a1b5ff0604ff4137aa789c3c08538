@@ -1,0 +1,21 @@
+test/cli.test.mjs
+  s_16542d5ea1822f::t_f2aeb1b6cd2dc6 862-902,1291-1340
+src/install.ts
+  s_16542d5ea1822f::t_e122df16ca6c8f 25,184-187,209,223
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.8",
+  "base_commit_sha": "a6af794e497a1b5ff0604ff4137aa789c3c08538",
+  "prompts": {},
+  "sessions": {
+    "s_16542d5ea1822f": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019e2643-28da-7060-87cf-0ff2f00e482a",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Gaurav Arora <whoarora@gmail.com>"
+    }
+  }
+}

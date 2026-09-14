@@ -1,0 +1,28 @@
+.github/workflows/publish.yml
+  s_7f1b0c932944ab::t_cb540c38d144c8 67
+  s_e18169f54f5735::t_8d286c29a2c26e 66,68
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.8",
+  "base_commit_sha": "f08aa2e51e241853f67502f9747fd6c89def09e5",
+  "prompts": {},
+  "sessions": {
+    "s_7f1b0c932944ab": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019e3b4d-805a-79f1-b9b5-89b562532fa3",
+        "model": "gpt-5.5"
+      },
+      "human_author": "sanxroz <san7yx@gmail.com>"
+    },
+    "s_e18169f54f5735": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019e3b49-1a50-7d41-a2f0-26aab625cf77",
+        "model": "gpt-5.3-codex-spark"
+      },
+      "human_author": "sanxroz <san7yx@gmail.com>"
+    }
+  }
+}
