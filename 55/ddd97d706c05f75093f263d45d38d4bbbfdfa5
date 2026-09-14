@@ -1,0 +1,25 @@
+src/install.ts
+  s_a09ebcdb2c0c02::t_2ba26f4453e348 371-372,465,618-619,631,633,639
+src/targets/codex.ts
+  s_a09ebcdb2c0c02::t_bca19ac9256c61 22-23
+src/utils.ts
+  s_a09ebcdb2c0c02::t_dbf16b3a979a4c 44-50
+test/cli.test.mjs
+  s_a09ebcdb2c0c02::t_07344a722e65de 8,1740-1797
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.22",
+  "base_commit_sha": "55ddd97d706c05f75093f263d45d38d4bbbfdfa5",
+  "prompts": {},
+  "sessions": {
+    "s_a09ebcdb2c0c02": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a0a0d2-7917-7760-853b-6414a8fc6313",
+        "model": "gpt-6-astra"
+      },
+      "human_author": "pomarie <43840779+pomarie@users.noreply.github.com>"
+    }
+  }
+}
