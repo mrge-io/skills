@@ -41,6 +41,13 @@ export async function installFile(
     }
   } else {
     try {
+      // copyFile follows destination symlinks; remove the link so migrations
+      // create a regular file without overwriting the old source.
+      const existing = await fs.lstat(target).catch((err: NodeJS.ErrnoException) => {
+        if (err.code !== "ENOENT") throw err
+        return null
+      })
+      if (existing?.isSymbolicLink()) await fs.unlink(target)
       await fs.copyFile(source, target)
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err)

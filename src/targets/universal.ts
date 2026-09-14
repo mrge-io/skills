@@ -2,7 +2,6 @@ import path from "path"
 import os from "os"
 import { promises as fs } from "fs"
 import type { Target, TargetResult } from "./index.js"
-import type { InstallMethod } from "../utils.js"
 import {
   parseFrontmatter,
   formatFrontmatter,
@@ -20,9 +19,9 @@ const CUBIC_COMMANDS = [
 ]
 
 export const universal: Target = {
-  async install(pluginRoot: string, outputRoot: string, method: InstallMethod = "paste"): Promise<TargetResult> {
+  async install(pluginRoot: string, outputRoot: string): Promise<TargetResult> {
     const agentsDir = path.join(outputRoot, ".agents")
-    const skillCount = await installSkills(pluginRoot, path.join(agentsDir, "skills"), method)
+    const skillCount = await installSkills(pluginRoot, path.join(agentsDir, "skills"), "paste")
 
     const cmdSource = path.join(pluginRoot, "commands")
     let cmdCount = 0

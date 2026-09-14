@@ -368,6 +368,8 @@ async function isTargetAlreadyInstalled(
       : path.join(layout.commandDir(outputRoot), entry.file)
 
     if (!(await pathExists(entryPath))) return false
+    if (entry.method === "paste" && entry.type === "skill"
+      && (await fs.lstat(entryPath)).isSymbolicLink()) return false
   }
 
   return true
@@ -557,6 +559,19 @@ export default defineCommand({
       return
     }
 
+    const targetPlans = selectedTargets.map((name) => {
+      const target = targets[name]
+      // Codex scans both its own and the universal skill directory,
+      // but does not discover symlinked SKILL.md files.
+      const targetMethod: InstallMethod = name === "codex" || name === "universal" ? "paste" : method
+      const outputRoot = args.output
+        ? path.resolve(String(args.output), name)
+        : target.defaultRoot()
+      return { name, outputRoot, method: targetMethod }
+    })
+    const sourceMethod = targetPlans.some((plan) => plan.method === "symlink")
+      ? "symlink" : "paste"
+
     // install_started is emitted after resolvePluginRoot so we have pluginVersion
 
     let pluginRoot: string
@@ -567,7 +582,7 @@ export default defineCommand({
       sourcePluginRoot = resolved.pluginRoot
       cloned = resolved.cloned
       try {
-        pluginRoot = await resolveInstallPluginRoot(sourcePluginRoot, method)
+        pluginRoot = await resolveInstallPluginRoot(sourcePluginRoot, sourceMethod)
       } catch (err) {
         if (cloned) await fs.rm(sourcePluginRoot, { recursive: true, force: true }).catch(() => {})
         throw err
@@ -612,11 +627,8 @@ export default defineCommand({
     const results: ResultEntry[] = []
 
     const installPlans = await Promise.all(
-      selectedTargets.map(async (name) => {
-        const target = targets[name]
-        const outputRoot = args.output
-          ? path.resolve(String(args.output), name)
-          : target.defaultRoot()
+      targetPlans.map(async (plan) => {
+        const { name, outputRoot, method } = plan
         const alreadyInstalled = !force
           && await isTargetAlreadyInstalled(
             name,
@@ -626,13 +638,13 @@ export default defineCommand({
             pluginVersion,
             method,
           )
-        return { name, outputRoot, alreadyInstalled }
+        return { ...plan, alreadyInstalled }
       }),
     )
 
     try {
       for (const plan of installPlans) {
-        const { name, outputRoot, alreadyInstalled } = plan
+        const { name, outputRoot, alreadyInstalled, method } = plan
         const target = targets[name]
         await fs.mkdir(outputRoot, { recursive: true })
 
