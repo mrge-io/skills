@@ -5,7 +5,7 @@ import os from "node:os"
 import { promisify } from "node:util"
 import path from "node:path"
 import { fileURLToPath } from "node:url"
-import { access, lstat, mkdir, readFile, rm, symlink, writeFile } from "node:fs/promises"
+import { access, cp, lstat, mkdir, readFile, rm, symlink, writeFile } from "node:fs/promises"
 import { pathToFileURL } from "node:url"
 
 const exec = promisify(execFile)
@@ -1788,6 +1788,37 @@ describe("Codex skill file discovery", () => {
       })
     }
   }
+
+  it("leaves the shared source untouched for Codex-only npx installs", async () => {
+    const root = path.join(TMP_BASE, "codex-npx-source")
+    const home = path.join(root, "home")
+    const packageRoot = path.join(home, ".npm", "_npx", "cache", "node_modules", "cubic-plugin")
+    const repository = path.join(__dirname, "..")
+    await mkdir(packageRoot, { recursive: true })
+    for (const file of ["dist", "skills", "commands", ".mcp.json", "package.json"]) {
+      await cp(path.join(repository, file), path.join(packageRoot, file), { recursive: true })
+    }
+    await symlink(path.join(repository, "node_modules"), path.join(packageRoot, "node_modules"))
+    const stableRoot = path.join(home, ".cubic-plugin", "plugin-source")
+    await mkdir(stableRoot, { recursive: true })
+    const sentinel = path.join(stableRoot, "existing-agent-source.md")
+    await writeFile(sentinel, "other agents still use this source")
+    const args = [path.join(packageRoot, "dist", "index.js"), "install", "--json", "--skills-only", "--method", "symlink", "-o", path.join(root, "output")]
+    const options = { env: { ...process.env, HOME: home } }
+    const { stdout } = await exec("node", [...args, "--to", "codex"], options)
+    const result = stdout.trim().split("\n").map(JSON.parse).find(e => e.type === "target_result")
+    assert.equal(result.status, "ok")
+    assert.equal(result.method, "paste")
+    assert.equal(await readFile(sentinel, "utf-8"), "other agents still use this source")
+    assert.ok((await lstat(path.join(root, "output", "codex", "skills", "run-review", "SKILL.md"))).isFile())
+
+    // Mixed installs still materialize the source for targets that need links.
+    await exec("node", [...args, "--to", "all"], options)
+    const claudeSkill = path.join(root, "output", "claude", ".claude", "skills", "run-review", "SKILL.md")
+    assert.ok((await lstat(claudeSkill)).isSymbolicLink())
+    await rm(packageRoot, { recursive: true })
+    assert.equal(await readFile(claudeSkill, "utf-8"), await readFile(path.join(repository, "skills", "run-review", "SKILL.md"), "utf-8"))
+  })
 
   it("preserves symlink installation for other agents", async () => {
     const outDir = path.join(TMP_BASE, "claude-skill-symlink")
