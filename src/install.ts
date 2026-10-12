@@ -19,7 +19,11 @@ import {
   type CubicManifest,
 } from "./utils.js"
 import { targets, TARGET_NAMES } from "./targets/index.js"
-import { claudeUserConfigPath, isClaudeDefaultRoot } from "./targets/claude.js"
+import {
+  claudeUserConfigPath,
+  isClaudeDefaultRoot,
+  isLegacyClaudeMcpEntry,
+} from "./targets/claude.js"
 import { createEmitter } from "./events.js"
 
 const CUBIC_MCP_URL = "https://www.cubic.dev/api/mcp"
@@ -237,6 +241,14 @@ async function targetHasMcpConfig(
 ): Promise<boolean> {
   switch (name) {
     case "claude":
+      if (isClaudeDefaultRoot(outputRoot)
+        && isLegacyClaudeMcpEntry(await readJsonSectionEntry(
+          path.join(outputRoot, ".mcp.json"),
+          "mcpServers",
+          "cubic",
+        ))) {
+        return false
+      }
       return jsonSectionHasMcpConfig(
         isClaudeDefaultRoot(outputRoot)
           ? claudeUserConfigPath()

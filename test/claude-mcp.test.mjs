@@ -212,6 +212,55 @@ describe("claude already-installed check at the default root", () => {
     assert.deepEqual(await s.calls(), [CLAUDE_MCP_ADD_ARGV])
   })
 
+  it("cleans the legacy entry on a rerun after a missing claude and manual registration", async () => {
+    const s = await scenario("rerun-legacy")
+    const legacy = {
+      mcpServers: { cubic: CUBIC_USER_SERVER, other: OTHER_SERVER },
+      unrelated: true,
+    }
+    await writeJson(s.legacyPath, legacy)
+    const first = targetResult((await s.run(
+      ["install", "--json", "--to", "claude"],
+      { PATH: "" },
+    )).stdout)
+    assert.equal(first.mcpServers, 0)
+    assert.deepEqual(await readJson(s.legacyPath), legacy)
+
+    await exec("claude", CLAUDE_MCP_ADD_ARGV, { env: s.env })
+    const rerun = targetResult((await s.run(
+      ["install", "--json", "--to", "claude"],
+      { FAKE_CLAUDE_MODE: "exists" },
+    )).stdout)
+
+    assert.equal(rerun.status, "ok")
+    assert.equal(rerun.reason, null)
+    assert.equal(rerun.mcpServers, 1)
+    assert.deepEqual(await readJson(s.legacyPath), {
+      mcpServers: { other: OTHER_SERVER },
+      unrelated: true,
+    })
+    const next = targetResult((await s.run(["install", "--json", "--to", "claude"])).stdout)
+    assert.equal(next.reason, "already installed")
+    assert.deepEqual(await s.calls(), [CLAUDE_MCP_ADD_ARGV, CLAUDE_MCP_ADD_ARGV])
+  })
+
+  it("still reports already installed when the legacy cubic entry is customized", async () => {
+    const s = await scenario("rerun-custom-legacy")
+    await s.run(["install", "--json", "--to", "claude"])
+    const custom = {
+      mcpServers: {
+        cubic: { ...CUBIC_USER_SERVER, headers: { Authorization: "Bearer token" } },
+      },
+    }
+    await writeJson(s.legacyPath, custom)
+
+    const result = targetResult((await s.run(["install", "--json", "--to", "claude"])).stdout)
+
+    assert.equal(result.reason, "already installed")
+    assert.deepEqual(await readJson(s.legacyPath), custom)
+    assert.deepEqual(await s.calls(), [CLAUDE_MCP_ADD_ARGV])
+  })
+
   it("reads $CLAUDE_CONFIG_DIR/.claude.json when that variable is set", async () => {
     const s = await scenario("config-dir")
     const configDir = path.join(TMP_BASE, "config-dir", "claude-config")

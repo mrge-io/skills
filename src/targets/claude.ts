@@ -34,6 +34,10 @@ export function isClaudeDefaultRoot(outputRoot: string): boolean {
   return outputRoot === os.homedir()
 }
 
+export function isLegacyClaudeMcpEntry(entry: unknown): boolean {
+  return isDeepStrictEqual(entry, CUBIC_MCP_SERVER)
+}
+
 type ClaudeRun =
   | { status: "ok" }
   | { status: "missing" }
@@ -70,7 +74,7 @@ async function removeLegacyMcpJsonEntry(configPath: string): Promise<void> {
   if (!(await pathExists(configPath))) return
   const config = await readJson(configPath)
   const servers = (config.mcpServers ?? {}) as Record<string, unknown>
-  if (!isDeepStrictEqual(servers.cubic, CUBIC_MCP_SERVER)) return
+  if (!isLegacyClaudeMcpEntry(servers.cubic)) return
   delete servers.cubic
   if (Object.keys(servers).length === 0) delete config.mcpServers
   if (Object.keys(config).length === 0) {
