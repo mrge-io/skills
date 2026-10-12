@@ -7,6 +7,7 @@ import path from "node:path"
 import { fileURLToPath } from "node:url"
 import { access, cp, lstat, mkdir, readFile, rm, symlink, writeFile } from "node:fs/promises"
 import { pathToFileURL } from "node:url"
+import { fakeClaudeHome } from "./fake-claude.mjs"
 
 const exec = promisify(execFile)
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
@@ -995,10 +996,10 @@ describe("install skip behavior", () => {
   })
 
   it("keeps per-target manifests separate when Claude and Universal share a home directory", async () => {
-    const homeDir = path.join(TMP_BASE, "shared-home")
+    const { home: homeDir, env } = await fakeClaudeHome(path.join(TMP_BASE, "shared-home"))
 
     await exec(
-      "node",
+      process.execPath,
       [
         CLI,
         "install",
@@ -1006,16 +1007,11 @@ describe("install skip behavior", () => {
         "--to",
         "claude",
       ],
-      {
-        env: {
-          ...process.env,
-          HOME: homeDir,
-        },
-      },
+      { env },
     )
 
     await exec(
-      "node",
+      process.execPath,
       [
         CLI,
         "install",
@@ -1023,19 +1019,14 @@ describe("install skip behavior", () => {
         "--to",
         "universal",
       ],
-      {
-        env: {
-          ...process.env,
-          HOME: homeDir,
-        },
-      },
+      { env },
     )
 
     await access(path.join(homeDir, ".cubic-manifest.claude.json"))
     await access(path.join(homeDir, ".cubic-manifest.universal.json"))
 
     const { stdout } = await exec(
-      "node",
+      process.execPath,
       [
         CLI,
         "install",
@@ -1043,12 +1034,7 @@ describe("install skip behavior", () => {
         "--to",
         "claude",
       ],
-      {
-        env: {
-          ...process.env,
-          HOME: homeDir,
-        },
-      },
+      { env },
     )
 
     const events = stdout

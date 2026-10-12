@@ -19,6 +19,11 @@ import {
   type CubicManifest,
 } from "./utils.js"
 import { targets, TARGET_NAMES } from "./targets/index.js"
+import {
+  claudeUserConfigPath,
+  isClaudeDefaultRoot,
+  isLegacyClaudeMcpEntry,
+} from "./targets/claude.js"
 import { createEmitter } from "./events.js"
 
 const CUBIC_MCP_URL = "https://www.cubic.dev/api/mcp"
@@ -59,7 +64,8 @@ function formatTargetLine(name: string, r: ResultEntry): string {
   if (r.prompts > 0) parts.push(`${r.prompts} prompts`)
   if (r.mcpServers > 0)
     parts.push(`${r.mcpServers} MCP server${r.mcpServers !== 1 ? "s" : ""}`)
-  return `  ${name}: ${parts.join(", ")}`
+  const line = `  ${name}: ${parts.join(", ")}`
+  return r.reason ? `${line}\n    ${r.reason}` : line
 }
 
 async function readJsonSectionEntry(
@@ -235,8 +241,18 @@ async function targetHasMcpConfig(
 ): Promise<boolean> {
   switch (name) {
     case "claude":
+      if (isClaudeDefaultRoot(outputRoot)
+        && isLegacyClaudeMcpEntry(await readJsonSectionEntry(
+          path.join(outputRoot, ".mcp.json"),
+          "mcpServers",
+          "cubic",
+        ))) {
+        return false
+      }
       return jsonSectionHasMcpConfig(
-        path.join(outputRoot, ".mcp.json"),
+        isClaudeDefaultRoot(outputRoot)
+          ? claudeUserConfigPath()
+          : path.join(outputRoot, ".mcp.json"),
         "mcpServers",
         "cubic",
       )
@@ -710,7 +726,7 @@ export default defineCommand({
               agent: name,
               ...tr,
               status: "ok",
-              reason: null,
+              reason: tr.reason ?? null,
             }
           }
           results.push(entry)
