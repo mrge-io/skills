@@ -13,6 +13,7 @@ export interface TargetResult {
   commands: number
   prompts: number
   mcpServers: number
+  reason?: string
 }
 
 export interface Target {

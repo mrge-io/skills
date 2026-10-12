@@ -104,6 +104,8 @@ The installer writes cubic's MCP server URL into each supported tool:
 https://www.cubic.dev/api/mcp
 ```
 
+For Claude Code, the installer runs `claude mcp add --scope user --transport http cubic https://www.cubic.dev/api/mcp`, which registers the server in your user config so it is available in every project. If the `claude` command is not on your PATH, the installer still installs the skills and commands, skips the server, and prints that command for you to run. With `--output <dir>`, it writes `<dir>/claude/.mcp.json` instead.
+
 Use OAuth to authenticate from the tool after install:
 
 - Claude Code: run `/mcp`, choose cubic, and complete the browser flow.
