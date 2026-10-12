@@ -130,8 +130,8 @@ export const claude: Target = {
       const p = path.join(claudeDir, "commands", cmd)
       if (await pathExists(p)) await fs.unlink(p)
     }
-    if (isClaudeDefaultRoot(outputRoot)) await removeCubicFromUserConfig()
     await removeMcpFromJsonConfig(path.join(outputRoot, ".mcp.json"), "cubic")
+    if (isClaudeDefaultRoot(outputRoot)) await removeCubicFromUserConfig()
     console.log("  claude: removed")
   },
 

@@ -318,6 +318,32 @@ describe("claude uninstall at the default root", () => {
     assert.deepEqual(await readJson(s.legacyPath), { mcpServers: { other: OTHER_SERVER } })
   })
 
+  it("cleans the legacy entry even when claude mcp remove fails", async () => {
+    const s = await scenario("uninstall-error")
+    await s.run(["install", "--json", "--to", "claude"])
+    await writeJson(s.legacyPath, {
+      mcpServers: { cubic: CUBIC_USER_SERVER, other: OTHER_SERVER },
+      unrelated: true,
+    })
+
+    await assert.rejects(
+      s.run(["uninstall", "--to", "claude"], { FAKE_CLAUDE_MODE: "error" }),
+      (err) => {
+        assert.notEqual(err.code, 0)
+        assert.match(`${err.stdout ?? ""}${err.stderr ?? ""}`, /claude mcp remove failed: simulated failure/)
+        return true
+      },
+    )
+
+    assert.deepEqual(await s.calls(), [CLAUDE_MCP_ADD_ARGV, CLAUDE_MCP_REMOVE_ARGV])
+    assert.equal(await exists(s.skillPath), false)
+    assert.equal(await exists(path.join(s.home, ".claude", "commands", "comments.md")), false)
+    assert.deepEqual(await readJson(s.legacyPath), {
+      mcpServers: { other: OTHER_SERVER },
+      unrelated: true,
+    })
+  })
+
   it("succeeds when claude reports no cubic server in the user scope", async () => {
     const s = await scenario("uninstall-absent")
     await s.run(["install", "--json", "--to", "claude"])
